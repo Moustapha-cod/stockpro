@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestion de la plateforme — StockPro SN{% endblock %}
+{% block page_title %}Gestion de la plateforme{% endblock %}
+
+{% block content %}
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3 py-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:50px;height:50px;background:rgba(13,110,253,.12);font-size:1.4rem;color:#0d6efd;">
+                    <i class="bi bi-building"></i>
+                </div>
+                <div>
+                    <div class="text-muted" style="font-size:.8rem;">Total entreprises</div>
+                    <div class="fw-bold fs-3 lh-1">{{ nb_total }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3 py-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:50px;height:50px;background:rgba(25,135,84,.12);font-size:1.4rem;color:#198754;">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted" style="font-size:.8rem;">Actives</div>
+                    <div class="fw-bold fs-3 lh-1 text-success">{{ nb_actives }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3 py-3">
+                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                     style="width:50px;height:50px;background:rgba(108,117,125,.12);font-size:1.4rem;color:#6c757d;">
+                    <i class="bi bi-pause-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted" style="font-size:.8rem;">Inactives</div>
+                    <div class="fw-bold fs-3 lh-1 text-secondary">{{ nb_inactives }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- En-tête section -->
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h6 class="mb-0 text-secondary fw-semibold">
+        <i class="bi bi-list-ul me-1"></i>Liste des entreprises
+    </h6>
+    <a href="{% url 'tenants:platform_creer' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Nouvelle entreprise
+    </a>
+</div>
+
+<!-- Tableau des entreprises -->
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:.88rem;">
+            <thead class="table-light">
+                <tr>
+                    <th style="min-width:180px;">Entreprise</th>
+                    <th style="min-width:130px;">Contact</th>
+                    <th class="text-center" style="width:90px;">Utilisateurs</th>
+                    <th class="text-center" style="width:80px;">Produits</th>
+                    <th class="text-center" style="width:80px;">Factures</th>
+                    <th class="text-center" style="width:90px;">Statut</th>
+                    <th class="text-center" style="width:120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in stats %}
+                {% with e=s.entreprise %}
+                <tr {% if not e.actif %}class="text-muted"{% endif %}>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if e.logo %}
+                            <img src="{{ e.logo.url }}" alt=""
+                                 style="height:30px;width:auto;max-width:50px;object-fit:contain;border-radius:4px;">
+                            {% else %}
+                            <div class="rounded d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                                 style="width:30px;height:30px;font-size:.7rem;background:rgba(13,110,253,.1);color:#0d6efd;">
+                                {{ e.nom|slice:":2"|upper }}
+                            </div>
+                            {% endif %}
+                            <div>
+                                <div class="fw-semibold">{{ e.nom }}</div>
+                                {% if e.ninea %}
+                                <div class="text-muted" style="font-size:.72rem;">NINEA : {{ e.ninea }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if e.telephone %}
+                        <div><i class="bi bi-telephone me-1 text-muted" style="font-size:.8rem;"></i>{{ e.telephone }}</div>
+                        {% endif %}
+                        {% if e.email %}
+                        <div class="text-muted" style="font-size:.75rem;">{{ e.email }}</div>
+                        {% endif %}
+                        {% if not e.telephone and not e.email %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge rounded-pill"
+                              style="background:rgba(13,110,253,.12);color:#0d6efd;font-size:.8rem;">
+                            {{ s.nb_users }}
+                        </span>
+                    </td>
+                    <td class="text-center text-muted">{{ s.nb_produits }}</td>
+                    <td class="text-center text-muted">{{ s.nb_factures }}</td>
+                    <td class="text-center">
+                        {% if e.actif %}
+                        <span class="badge bg-success" style="font-size:.75rem;">Active</span>
+                        {% else %}
+                        <span class="badge bg-secondary" style="font-size:.75rem;">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex align-items-center justify-content-center gap-1">
+                            <!-- Modifier -->
+                            <a href="{% url 'tenants:platform_modifier' e.pk %}"
+                               class="btn btn-sm btn-outline-primary p-1 lh-1" title="Modifier"
+                               style="width:28px;height:28px;">
+                                <i class="bi bi-pencil" style="font-size:.8rem;"></i>
+                            </a>
+
+                            <!-- Activer / Désactiver -->
+                            <form method="post" action="{% url 'tenants:platform_toggle' e.pk %}" class="d-inline m-0">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="btn btn-sm p-1 lh-1 {% if e.actif %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                                        title="{% if e.actif %}Désactiver{% else %}Activer{% endif %}"
+                                        style="width:28px;height:28px;">
+                                    <i class="bi {% if e.actif %}bi-pause{% else %}bi-play{% endif %}" style="font-size:.8rem;"></i>
+                                </button>
+                            </form>
+
+                            <!-- Supprimer -->
+                            <a href="{% url 'tenants:platform_supprimer' e.pk %}"
+                               class="btn btn-sm btn-outline-danger p-1 lh-1" title="Supprimer"
+                               style="width:28px;height:28px;">
+                                <i class="bi bi-trash" style="font-size:.8rem;"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="bi bi-building fs-1 d-block mb-2 opacity-25"></i>
+                        <div>Aucune entreprise enregistrée</div>
+                        <a href="{% url 'tenants:platform_creer' %}" class="btn btn-primary btn-sm mt-3">
+                            <i class="bi bi-plus-lg me-1"></i>Créer la première entreprise
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

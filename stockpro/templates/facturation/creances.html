@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Créances — StockPro SN{% endblock %}
+{% block page_title %}Suivi des créances{% endblock %}
+
+{% block content %}
+
+<!-- KPIs ------------------------------------------------------------------>
+<div class="row g-3 mb-3">
+    <div class="col-sm-6 col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-danger bg-opacity-10 text-danger d-flex align-items-center justify-content-center flex-shrink-0" style="width:52px;height:52px;font-size:1.4rem;">
+                    <i class="bi bi-cash-coin"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Total dû</div>
+                    <div class="fw-bold fs-4 text-danger">{{ total_du|intcomma }} <small class="text-muted fw-normal fs-6">FCFA</small></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width:52px;height:52px;font-size:1.4rem;">
+                    <i class="bi bi-receipt"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Factures non soldées</div>
+                    <div class="fw-bold fs-4">{{ nb_factures }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-danger bg-opacity-10 text-danger d-flex align-items-center justify-content-center flex-shrink-0" style="width:52px;height:52px;font-size:1.4rem;">
+                    <i class="bi bi-exclamation-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">En retard</div>
+                    <div class="fw-bold fs-4 text-danger">{{ nb_retard }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres --------------------------------------------------------------->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <select name="client" class="form-select form-select-sm">
+                    <option value="">Tous les clients</option>
+                    {% for c in clients %}
+                    <option value="{{ c.pk }}" {% if client_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nom }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="retard" class="form-select form-select-sm">
+                    <option value="">Toutes les créances</option>
+                    <option value="1" {% if retard == '1' %}selected{% endif %}>En retard uniquement</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+                    <i class="bi bi-funnel me-1"></i>Filtrer
+                </button>
+                <a href="{% url 'facturation:creances' %}" class="btn btn-sm btn-outline-secondary" title="Réinitialiser">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tableau des créances -------------------------------------------------->
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Facture</th>
+                    <th>Client</th>
+                    <th>Émise le</th>
+                    <th>Échéance</th>
+                    <th class="text-end">Total TTC</th>
+                    <th class="text-end">Payé</th>
+                    <th class="text-end">Reste dû</th>
+                    <th class="text-center" style="width:120px;">Avancement</th>
+                    <th class="text-center">Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in factures %}
+                <tr class="{% if f.est_en_retard %}table-danger bg-opacity-10{% endif %}">
+                    <td>
+                        <a href="{% url 'facturation:facture_detail' f.pk %}"
+                           class="fw-semibold text-decoration-none small">{{ f.numero }}</a>
+                    </td>
+                    <td>
+                        <div class="small fw-semibold">{{ f.client.nom }}</div>
+                        {% if f.client.telephone %}<div class="text-muted" style="font-size:.72rem;">{{ f.client.telephone }}</div>{% endif %}
+                    </td>
+                    <td class="small text-muted">{{ f.date_emission|date:"d/m/Y" }}</td>
+                    <td class="small {% if f.est_en_retard %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+                        {{ f.date_echeance|date:"d/m/Y"|default:"—" }}
+                        {% if f.est_en_retard %}
+                        <br><span class="badge bg-danger" style="font-size:.65rem;">En retard</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end small">{{ f.montant_ttc|intcomma }}</td>
+                    <td class="text-end small text-success">{{ f.montant_paye|intcomma }}</td>
+                    <td class="text-end fw-bold text-danger small">{{ f.montant_restant|intcomma }}</td>
+                    <td>
+                        <div class="progress" style="height:6px;">
+                            <div class="progress-bar bg-success" style="width:{{ f.taux_paiement }}%"></div>
+                        </div>
+                        <div class="text-muted text-end" style="font-size:.7rem;">{{ f.taux_paiement }}%</div>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge {% if f.statut == 'partielle' %}bg-warning text-dark{% else %}bg-primary{% endif %} small">
+                            {{ f.get_statut_display }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <!-- Paiement rapide intégral -->
+                        <form method="post" action="{% url 'facturation:facture_detail' f.pk %}"
+                              onsubmit="return confirm('Solder {{ f.numero }} ({{ f.montant_restant|intcomma }} FCFA) ?')"
+                              class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="mode_integral" value="especes">
+                            <button type="submit" name="payer_integral" value="1"
+                                    class="btn btn-sm btn-outline-success py-0 px-2" title="Solder intégralement">
+                                <i class="bi bi-check-circle"></i>
+                            </button>
+                        </form>
+                        <a href="{% url 'facturation:facture_detail' f.pk %}"
+                           class="btn btn-sm btn-outline-primary py-0 px-2 ms-1" title="Voir la facture">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-5">
+                        <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+                        {% if retard == '1' %}
+                        Aucune facture en retard
+                        {% else %}
+                        Aucune créance en cours — tous les clients sont à jour !
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if factures %}
+            <tfoot class="table-light fw-bold">
+                <tr>
+                    <td colspan="4" class="small">Total ({{ nb_factures }} factures)</td>
+                    <td colspan="2"></td>
+                    <td class="text-end text-danger">{{ total_du|intcomma }} FCFA</td>
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}

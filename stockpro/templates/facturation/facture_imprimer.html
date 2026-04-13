@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facture {{ facture.numero }} — {{ entreprise.nom }}</title>
+    {% load static humanize %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #222; background: #fff; }
+
+        @media screen {
+            body { background: #e9ecef; }
+            .page { max-width: 800px; margin: 2rem auto; background: #fff; padding: 2.5rem; box-shadow: 0 4px 24px rgba(0,0,0,.12); border-radius: 8px; }
+            .no-print { display: flex; gap: .75rem; justify-content: center; margin-bottom: 1.5rem; }
+        }
+
+        @media print {
+            body { background: #fff; }
+            .page { margin: 0; padding: 1.5cm 2cm; box-shadow: none; }
+            .no-print { display: none !important; }
+            @page { margin: 1.5cm; size: A4; }
+        }
+
+        /* En-tête */
+        .facture-header { border-bottom: 3px solid #1a237e; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
+        .company-name { font-size: 1.5rem; font-weight: 700; color: #1a237e; }
+        .facture-title { font-size: 1.6rem; font-weight: 700; color: #1a237e; text-align: right; }
+        .facture-numero { font-size: 1rem; color: #555; text-align: right; }
+
+        /* Infos client / facture */
+        .info-box { background: #f8f9fa; border-radius: 6px; padding: 1rem; height: 100%; }
+        .info-box .label { font-size: .75rem; text-transform: uppercase; color: #888; font-weight: 600; letter-spacing: .05em; }
+        .info-box .value { font-weight: 600; margin-top: .15rem; }
+
+        /* Statut badge */
+        .statut-badge { display: inline-block; padding: .3rem .9rem; border-radius: 20px; font-size: .8rem; font-weight: 700; letter-spacing: .03em; }
+        .statut-payee    { background: #d1e7dd; color: #0a3622; }
+        .statut-partielle{ background: #fff3cd; color: #664d03; }
+        .statut-emise    { background: #cfe2ff; color: #084298; }
+        .statut-annulee  { background: #e2e3e5; color: #41464b; }
+
+        /* Tableau lignes */
+        .table-lignes thead { background: #1a237e; color: #fff; }
+        .table-lignes thead th { padding: .6rem .75rem; font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+        .table-lignes tbody td { padding: .55rem .75rem; border-bottom: 1px solid #f0f0f0; }
+        .table-lignes tbody tr:last-child td { border-bottom: none; }
+
+        /* Totaux */
+        .totaux-table td { padding: .3rem .5rem; font-size: .9rem; }
+        .totaux-table .total-ttc { font-size: 1.05rem; font-weight: 700; color: #1a237e; border-top: 2px solid #1a237e; }
+
+        /* Pied de page */
+        .footer-facture { border-top: 1px solid #dee2e6; margin-top: 2rem; padding-top: 1rem; font-size: .78rem; color: #888; }
+
+        /* Barre de paiement */
+        .progress-paiement { height: 8px; border-radius: 4px; background: #e9ecef; overflow: hidden; }
+        .progress-paiement-bar { height: 100%; background: #198754; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<!-- Boutons d'action (masqués à l'impression) -->
+<div class="no-print">
+    <button onclick="window.print()" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-2" viewBox="0 0 16 16">
+            <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/>
+            <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z"/>
+        </svg>
+        Imprimer / Enregistrer PDF
+    </button>
+    <a href="{% url 'facturation:facture_detail' facture.pk %}" class="btn btn-outline-secondary">
+        ← Retour à la facture
+    </a>
+</div>
+
+<div class="page">
+
+    <!-- EN-TÊTE ─────────────────────────────────────────────────────── -->
+    <div class="facture-header">
+        <div class="row align-items-start">
+            <div class="col-7">
+                {% if entreprise.logo %}
+                <img src="{{ entreprise.logo.url }}" alt="{{ entreprise.nom }}" style="max-height:70px;max-width:220px;object-fit:contain;margin-bottom:.5rem;">
+                {% endif %}
+                <div class="company-name">{{ entreprise.nom }}</div>
+                {% if entreprise.adresse %}<div class="text-muted small">{{ entreprise.adresse }}</div>{% endif %}
+                {% if entreprise.telephone %}<div class="text-muted small">Tél : {{ entreprise.telephone }}</div>{% endif %}
+                {% if entreprise.email %}<div class="text-muted small">{{ entreprise.email }}</div>{% endif %}
+                {% if entreprise.ninea %}<div class="text-muted small">NINEA : {{ entreprise.ninea }}</div>{% endif %}
+                {% if entreprise.registre_commerce %}<div class="text-muted small">RC : {{ entreprise.registre_commerce }}</div>{% endif %}
+            </div>
+            <div class="col-5 text-end">
+                <div class="facture-title">FACTURE</div>
+                <div class="facture-numero">N° {{ facture.numero }}</div>
+                <div class="mt-2">
+                    <span class="statut-badge statut-{{ facture.statut }}">
+                        {{ facture.get_statut_display|upper }}
+                    </span>
+                </div>
+                {% if facture.est_en_retard %}
+                <div class="mt-1 text-danger small fw-bold">⚠ Paiement en retard</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- INFOS CLIENT / DATES ──────────────────────────────────────────── -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-5">
+            <div class="info-box">
+                <div class="label">Facturé à</div>
+                <div class="value fs-6 mt-1">{{ facture.client.nom }}</div>
+                {% if facture.client.contact %}<div class="text-muted small">{{ facture.client.contact }}</div>{% endif %}
+                {% if facture.client.telephone %}<div class="text-muted small">{{ facture.client.telephone }}</div>{% endif %}
+                {% if facture.client.email %}<div class="text-muted small">{{ facture.client.email }}</div>{% endif %}
+                {% if facture.client.adresse %}<div class="text-muted small mt-1">{{ facture.client.adresse }}</div>{% endif %}
+                {% if facture.client.ville %}<div class="text-muted small">{{ facture.client.ville }}</div>{% endif %}
+                {% if facture.client.ninea %}<div class="text-muted small">NINEA : {{ facture.client.ninea }}</div>{% endif %}
+            </div>
+        </div>
+        <div class="col-md-4 offset-md-3">
+            <div class="info-box">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="label">Date d'émission</div>
+                        <div class="value">{{ facture.date_emission|date:"d/m/Y" }}</div>
+                    </div>
+                    {% if facture.date_echeance %}
+                    <div class="col-6">
+                        <div class="label">Échéance</div>
+                        <div class="value {% if facture.est_en_retard %}text-danger{% endif %}">
+                            {{ facture.date_echeance|date:"d/m/Y" }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="col-12 mt-1">
+                        <div class="label">Mode de paiement</div>
+                        <div class="value">{{ facture.get_mode_paiement_display }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if facture.objet %}
+    <div class="mb-3 text-muted small"><strong>Objet :</strong> {{ facture.objet }}</div>
+    {% endif %}
+
+    <!-- LIGNES ─────────────────────────────────────────────────────────── -->
+    <table class="table table-lignes mb-0 w-100" style="border-radius:6px;overflow:hidden;">
+        <thead>
+            <tr>
+                <th style="width:5%">#</th>
+                <th style="width:40%">Désignation</th>
+                <th style="width:10%">Réf.</th>
+                <th class="text-center" style="width:8%">Qté</th>
+                <th class="text-end" style="width:14%">PU HT</th>
+                <th class="text-center" style="width:8%">Remise</th>
+                <th class="text-end" style="width:15%">Total HT</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ligne in lignes %}
+            <tr>
+                <td class="text-muted">{{ forloop.counter }}</td>
+                <td class="fw-semibold">{{ ligne.designation }}</td>
+                <td class="text-muted small">{{ ligne.reference|default:"—" }}</td>
+                <td class="text-center">{{ ligne.quantite }}</td>
+                <td class="text-end">{{ ligne.prix_unitaire_ht|intcomma }}</td>
+                <td class="text-center text-muted">{% if ligne.remise %}{{ ligne.remise }}%{% else %}—{% endif %}</td>
+                <td class="text-end fw-semibold">{{ ligne.montant_ht|floatformat:0|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center text-muted py-3">Aucune ligne</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- TOTAUX ─────────────────────────────────────────────────────────── -->
+    <div class="row justify-content-end mt-3">
+        <div class="col-md-5">
+            <table class="totaux-table w-100">
+                <tr>
+                    <td class="text-muted">Sous-total HT</td>
+                    <td class="text-end">{{ facture.montant_ht|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                {% if facture.remise_globale and facture.remise_globale > 0 %}
+                <tr>
+                    <td class="text-muted">Remise globale ({{ facture.remise_globale }}%)</td>
+                    <td class="text-end text-danger">incluse</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td class="text-muted">TVA ({{ facture.taux_tva }}%)</td>
+                    <td class="text-end">{{ facture.montant_tva|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                <tr class="total-ttc">
+                    <td class="py-2">TOTAL TTC</td>
+                    <td class="text-end py-2">{{ facture.montant_ttc|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                {% if facture.montant_paye > 0 %}
+                <tr>
+                    <td class="text-success">Déjà payé</td>
+                    <td class="text-end text-success">- {{ facture.montant_paye|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
+                        Reste dû
+                    </td>
+                    <td class="text-end fw-bold {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ facture.montant_restant|intcomma }} {{ entreprise.devise }}
+                    </td>
+                </tr>
+                {% endif %}
+            </table>
+
+            <!-- Barre de paiement -->
+            {% if facture.montant_ttc > 0 and facture.montant_paye > 0 %}
+            <div class="mt-2">
+                <div class="progress-paiement">
+                    <div class="progress-paiement-bar" style="width:{{ facture.taux_paiement }}%"></div>
+                </div>
+                <div class="text-muted small text-end mt-1">{{ facture.taux_paiement }}% payé</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- HISTORIQUE PAIEMENTS ────────────────────────────────────────────── -->
+    {% if paiements %}
+    <div class="mt-4">
+        <div class="fw-semibold small text-muted mb-2" style="text-transform:uppercase;letter-spacing:.05em;">Historique des paiements</div>
+        <table class="table table-sm mb-0" style="font-size:.82rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Mode</th>
+                    <th>Référence</th>
+                    <th class="text-end">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in paiements %}
+                <tr>
+                    <td>{{ p.date_paiement|date:"d/m/Y" }}</td>
+                    <td>{{ p.get_mode_paiement_display }}</td>
+                    <td class="text-muted">{{ p.reference_paiement|default:"—" }}</td>
+                    <td class="text-end fw-semibold text-success">{{ p.montant|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- NOTES ──────────────────────────────────────────────────────────── -->
+    {% if facture.notes %}
+    <div class="mt-4 p-3 bg-light rounded" style="font-size:.85rem;">
+        <div class="fw-semibold text-muted small mb-1">Notes / Conditions :</div>
+        {{ facture.notes }}
+    </div>
+    {% endif %}
+
+    <!-- PIED DE PAGE ────────────────────────────────────────────────────── -->
+    <div class="footer-facture text-center">
+        {% if entreprise.mentions_facture %}
+        <div class="mb-1">{{ entreprise.mentions_facture }}</div>
+        {% endif %}
+        <div>{{ entreprise.nom }}
+            {% if entreprise.ninea %} — NINEA : {{ entreprise.ninea }}{% endif %}
+            {% if entreprise.registre_commerce %} — RC : {{ entreprise.registre_commerce }}{% endif %}
+        </div>
+        {% if entreprise.telephone or entreprise.email %}
+        <div>
+            {% if entreprise.telephone %}Tél : {{ entreprise.telephone }}{% endif %}
+            {% if entreprise.email %} — {{ entreprise.email }}{% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+// Impression automatique si paramètre ?auto=1
+if (new URLSearchParams(window.location.search).get('auto') === '1') {
+    window.addEventListener('load', () => setTimeout(() => window.print(), 500));
+}
+</script>
+</body>
+</html>

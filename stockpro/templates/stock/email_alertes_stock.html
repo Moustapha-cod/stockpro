@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alertes stock — {{ entreprise.nom }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:30px 0;">
+  <tr>
+    <td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+
+        <!-- En-tête -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1a237e,#283593);padding:28px 32px;">
+            <table width="100%">
+              <tr>
+                <td>
+                  <div style="color:#fff;font-size:20px;font-weight:bold;">📦 StockPro SN</div>
+                  <div style="color:rgba(255,255,255,.75);font-size:13px;margin-top:4px;">
+                    {{ entreprise.nom }}
+                  </div>
+                </td>
+                <td align="right">
+                  <div style="background:rgba(255,255,255,.15);border-radius:6px;padding:8px 14px;color:#fff;font-size:13px;">
+                    Rapport de stock
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Résumé -->
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <table width="100%" cellspacing="8">
+              <tr>
+                {% if nb_ruptures %}
+                <td width="50%" style="background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;padding:16px;text-align:center;">
+                  <div style="font-size:28px;font-weight:bold;color:#e53e3e;">{{ nb_ruptures }}</div>
+                  <div style="font-size:12px;color:#c53030;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">
+                    Rupture{{ nb_ruptures|pluralize }} de stock
+                  </div>
+                </td>
+                {% endif %}
+                {% if nb_alertes %}
+                <td width="50%" style="background:#fffbf0;border:1px solid #fbd38d;border-radius:8px;padding:16px;text-align:center;">
+                  <div style="font-size:28px;font-weight:bold;color:#d97706;">{{ nb_alertes }}</div>
+                  <div style="font-size:12px;color:#b45309;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">
+                    Stock{{ nb_alertes|pluralize }} bas
+                  </div>
+                </td>
+                {% endif %}
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Section ruptures -->
+        {% if ruptures %}
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <div style="font-size:14px;font-weight:bold;color:#e53e3e;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #fed7d7;">
+              🚨 Ruptures de stock — réapprovisionner en urgence
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr style="background:#f7fafc;">
+                <th style="text-align:left;padding:8px 10px;font-size:12px;color:#718096;font-weight:600;border-bottom:1px solid #e2e8f0;">Produit</th>
+                <th style="text-align:left;padding:8px 10px;font-size:12px;color:#718096;font-weight:600;border-bottom:1px solid #e2e8f0;">Référence</th>
+                <th style="text-align:left;padding:8px 10px;font-size:12px;color:#718096;font-weight:600;border-bottom:1px solid #e2e8f0;">Catégorie</th>
+              </tr>
+              {% for p in ruptures %}
+              <tr style="border-bottom:1px solid #f0f0f0;">
+                <td style="padding:10px;font-size:13px;font-weight:600;color:#2d3748;">{{ p.nom }}</td>
+                <td style="padding:10px;font-size:12px;color:#718096;font-family:monospace;">{{ p.reference|default:"—" }}</td>
+                <td style="padding:10px;font-size:12px;color:#718096;">{{ p.categorie.nom|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </td>
+        </tr>
+        {% endif %}
+
+        <!-- Section alertes -->
+        {% if alertes %}
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <div style="font-size:14px;font-weight:bold;color:#d97706;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #fbd38d;">
+              ⚠️ Stocks bas — à commander prochainement
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr style="background:#f7fafc;">
+                <th style="text-align:left;padding:8px 10px;font-size:12px;color:#718096;font-weight:600;border-bottom:1px solid #e2e8f0;">Produit</th>
+                <th style="text-align:center;padding:8px 10px;font-size:12px;color:#718096;font-weight:600;border-bottom:1px solid #e2e8f0;">Stock actuel</th>
+                <th style="text-align:center;padding:8px 10px;font-size:12px;color:#718096;font-weight:600;border-bottom:1px solid #e2e8f0;">Seuil alerte</th>
+                <th style="text-align:left;padding:8px 10px;font-size:12px;color:#718096;font-weight:600;border-bottom:1px solid #e2e8f0;">Catégorie</th>
+              </tr>
+              {% for p in alertes %}
+              <tr style="border-bottom:1px solid #f0f0f0;">
+                <td style="padding:10px;font-size:13px;font-weight:600;color:#2d3748;">{{ p.nom }}</td>
+                <td style="padding:10px;text-align:center;">
+                  <span style="background:#fed7d7;color:#c53030;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:bold;">
+                    {{ p.quantite_stock }}
+                  </span>
+                </td>
+                <td style="padding:10px;text-align:center;font-size:12px;color:#718096;">{{ p.seuil_alerte }}</td>
+                <td style="padding:10px;font-size:12px;color:#718096;">{{ p.categorie.nom|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </td>
+        </tr>
+        {% endif %}
+
+        <!-- Pied de page -->
+        <tr>
+          <td style="padding:24px 32px 32px;">
+            <div style="background:#f7fafc;border-radius:6px;padding:14px 16px;font-size:12px;color:#718096;text-align:center;">
+              Email généré automatiquement par StockPro SN · {{ entreprise.nom }}<br>
+              Pour gérer votre stock, connectez-vous à l'application.
+            </div>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

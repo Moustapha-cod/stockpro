@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Nouveau mouvement — StockPro SN{% endblock %}
+{% block page_title %}Enregistrer un mouvement de stock{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold"><i class="bi bi-arrow-left-right me-2 text-primary"></i>Nouveau mouvement</div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Produit *</label>
+                        {{ form.produit }}
+                        {% if form.produit.errors %}<div class="text-danger small">{{ form.produit.errors }}</div>{% endif %}
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Type de mouvement *</label>
+                            {{ form.type_mouvement }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Quantité *</label>
+                            {{ form.quantite }}
+                            {% if form.quantite.errors %}<div class="text-danger small">{{ form.quantite.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Prix unitaire</label>
+                            {{ form.prix_unitaire }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Fournisseur (si entrée)</label>
+                        {{ form.fournisseur }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Référence document</label>
+                        {{ form.reference_document }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Motif / remarque</label>
+                        {{ form.motif }}
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
+                        <a href="{% url 'stock:mouvement_liste' %}" class="btn btn-outline-secondary">Annuler</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

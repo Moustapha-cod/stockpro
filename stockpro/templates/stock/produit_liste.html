@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Produits — StockPro SN{% endblock %}
+{% block page_title %}Produits{% endblock %}
+
+{% block content %}
+<!-- Actions + Filtres -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <form class="d-flex gap-2 flex-wrap" method="get">
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Rechercher…" style="width:200px;">
+        <select name="categorie" class="form-select form-select-sm" style="width:160px;">
+            <option value="">Toutes catégories</option>
+            {% for cat in categories %}
+            <option value="{{ cat.pk }}" {% if categorie_id == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.nom }}</option>
+            {% endfor %}
+        </select>
+        <select name="statut" class="form-select form-select-sm" style="width:140px;">
+            <option value="">Tous statuts</option>
+            <option value="alerte" {% if statut == 'alerte' %}selected{% endif %}>En alerte</option>
+            <option value="rupture" {% if statut == 'rupture' %}selected{% endif %}>En rupture</option>
+            <option value="actif" {% if statut == 'actif' %}selected{% endif %}>Actif</option>
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+        {% if q or categorie_id or statut %}<a href="{% url 'stock:produit_liste' %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></a>{% endif %}
+    </form>
+    <a href="{% url 'stock:produit_creer' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Nouveau produit</a>
+</div>
+
+<!-- Tableau -->
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold small"><i class="bi bi-box me-2 text-primary"></i>{{ total }} produit{{ total|pluralize }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:48px"></th>
+                    <th>Référence</th>
+                    <th>Désignation</th>
+                    <th>Catégorie</th>
+                    <th>Fournisseur</th>
+                    <th class="text-end">Prix achat</th>
+                    <th class="text-end">Prix vente</th>
+                    <th class="text-center">Stock</th>
+                    <th class="text-center">Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produits %}
+                <tr>
+                    <td>
+                        {% with extra=p.photos.all %}
+                        {% if p.image or extra %}
+                        {% comment %}Construire la liste JSON de toutes les photos{% endcomment %}
+                        <div class="position-relative d-inline-block"
+                             style="cursor:zoom-in;"
+                             onclick="ouvrirGalerie(this)"
+                             data-nom="{{ p.nom }}"
+                             data-ref="{{ p.reference }}"
+                             data-photos="[{% if p.image %}&quot;{{ p.image.url }}&quot;{% endif %}{% for ph in extra %}{% if p.image or not forloop.first %},{% endif %}&quot;{{ ph.image.url }}&quot;{% endfor %}]">
+                            {% if p.image %}
+                            <img src="{{ p.image.url }}" alt="{{ p.nom }}"
+                                 style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6;">
+                            {% else %}
+                            <img src="{{ extra.0.image.url }}" alt="{{ p.nom }}"
+                                 style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6;">
+                            {% endif %}
+                            {% with total=extra|length %}
+                            {% if total %}
+                            <span class="position-absolute badge rounded-pill bg-primary"
+                                  style="font-size:.55rem;padding:.2em .4em;top:-4px;right:-6px;">+{{ total }}</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        {% else %}
+                        <div class="d-flex align-items-center justify-content-center bg-light rounded"
+                             style="width:40px;height:40px;border:1px solid #dee2e6;">
+                            <i class="bi bi-image text-muted" style="font-size:.85rem;"></i>
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="text-muted small">{{ p.reference }}</td>
+                    <td>
+                        <div class="fw-semibold">{{ p.nom }}</div>
+                        {% if p.marque %}<div class="text-muted small">{{ p.marque }}</div>{% endif %}
+                    </td>
+                    <td>
+                        {% if p.categorie %}
+                        <span class="badge rounded-pill" style="background:{{ p.categorie.couleur }}20;color:{{ p.categorie.couleur }};border:1px solid {{ p.categorie.couleur }}40;">
+                            {{ p.categorie.nom }}
+                        </span>
+                        {% else %}<span class="text-muted small">—</span>{% endif %}
+                    </td>
+                    <td class="small">{{ p.fournisseur.nom|default:"—" }}</td>
+                    <td class="text-end small">{{ p.prix_achat|intcomma }}</td>
+                    <td class="text-end small fw-semibold">{{ p.prix_vente|intcomma }}</td>
+                    <td class="text-center">
+                        <span class="fw-bold {% if p.en_rupture %}text-danger{% elif p.en_alerte %}text-warning{% else %}text-success{% endif %}">
+                            {{ p.quantite_stock }}
+                        </span>
+                        <span class="text-muted small"> / {{ p.seuil_alerte }}</span>
+                    </td>
+                    <td class="text-center">
+                        {% if not p.actif %}
+                        <span class="badge bg-secondary">Inactif</span>
+                        {% elif p.en_rupture %}
+                        <span class="badge bg-danger">Rupture</span>
+                        {% elif p.en_alerte %}
+                        <span class="badge bg-warning text-dark">Alerte</span>
+                        {% else %}
+                        <span class="badge bg-success">OK</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'stock:produit_modifier' p.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2"><i class="bi bi-pencil"></i></a>
+                        <a href="{% url 'stock:produit_supprimer' p.pk %}" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i></a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="10" class="text-center text-muted py-4">Aucun produit trouvé</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal galerie -->
+<div class="modal fade" id="modalGalerie" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header py-2 border-0 px-3">
+                <div>
+                    <div class="fw-semibold" id="modalNom"></div>
+                    <div class="text-muted small" id="modalRef"></div>
+                </div>
+                <span class="badge bg-secondary ms-2" id="modalCount" style="font-size:.75rem;"></span>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-dark text-center position-relative" style="min-height:280px;">
+                <img id="modalImg" src="" alt=""
+                     style="max-width:100%;max-height:72vh;object-fit:contain;">
+                <button id="btnPrev" onclick="nav(-1)"
+                        class="btn btn-light position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
+                        style="width:36px;height:36px;opacity:.85;">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button id="btnNext" onclick="nav(1)"
+                        class="btn btn-light position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
+                        style="width:36px;height:36px;opacity:.85;">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+            <!-- Bande vignettes -->
+            <div id="modalThumbs" class="d-flex gap-2 p-2 bg-dark overflow-auto" style="border-radius:0 0 .375rem .375rem;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let _photos = [], _idx = 0;
+const modal = () => bootstrap.Modal.getOrCreateInstance(document.getElementById('modalGalerie'));
+
+function ouvrirGalerie(el) {
+    _photos = JSON.parse(el.dataset.photos);
+    _idx = 0;
+    document.getElementById('modalNom').textContent = el.dataset.nom;
+    document.getElementById('modalRef').textContent  = 'Réf. ' + el.dataset.ref;
+    afficher();
+    modal().show();
+}
+
+function afficher() {
+    document.getElementById('modalImg').src = _photos[_idx];
+    document.getElementById('modalCount').textContent = _photos.length > 1 ? `${_idx + 1} / ${_photos.length}` : '';
+    document.getElementById('btnPrev').style.display = _idx > 0 ? '' : 'none';
+    document.getElementById('btnNext').style.display = _idx < _photos.length - 1 ? '' : 'none';
+
+    // Vignettes
+    const wrap = document.getElementById('modalThumbs');
+    wrap.style.display = _photos.length > 1 ? 'flex' : 'none';
+    wrap.innerHTML = '';
+    _photos.forEach((src, i) => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.style.cssText = `width:54px;height:54px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid ${i===_idx?'#0d6efd':'transparent'};flex-shrink:0;`;
+        img.onclick = () => { _idx = i; afficher(); };
+        wrap.appendChild(img);
+    });
+}
+
+function nav(dir) {
+    _idx = Math.max(0, Math.min(_photos.length - 1, _idx + dir));
+    afficher();
+}
+
+document.addEventListener('keydown', e => {
+    if (!document.getElementById('modalGalerie').classList.contains('show')) return;
+    if (e.key === 'ArrowLeft')  nav(-1);
+    if (e.key === 'ArrowRight') nav(1);
+});
+</script>
+{% endblock %}

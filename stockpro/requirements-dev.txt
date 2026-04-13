@@ -1,0 +1,9 @@
+# StockPro SN — Dépendances de développement uniquement
+# pip install -r requirements-dev.txt
+-r requirements.txt
+
+django-debug-toolbar==4.3.0
+django-extensions==3.2.3
+pytest==8.1.1
+pytest-django==4.8.0
+factory-boy==3.3.0

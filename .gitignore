@@ -1,0 +1,44 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.tox/
+
+# ── Django ────────────────────────────────────────────────────────────────────
+*.sqlite3
+/stockpro/staticfiles/
+/stockpro/media/
+/stockpro/logs/*.log
+
+# ── Environnement ─────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+*.env
+!.env.example
+
+# ── Virtualenv ────────────────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Tests & couverture ────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/

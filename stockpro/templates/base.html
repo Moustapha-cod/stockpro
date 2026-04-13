@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}StockPro SN{% endblock %}</title>
+    {% load static %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65"
+          crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+          crossorigin="anonymous">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+    <style>
+        body { background-color: #f8f9fa; }
+        .sidebar {
+            height: 100vh;
+            background: linear-gradient(180deg, #1a237e 0%, #283593 100%);
+            width: 250px;
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 100;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+            overflow-y: auto;
+        }
+        .sidebar .brand { padding: 1.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: .6rem 1.2rem;
+            border-radius: 6px;
+            margin: 2px 8px;
+            font-size: .9rem;
+            transition: all .2s;
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+        }
+        .sidebar .nav-link i { width: 20px; margin-right: 8px; }
+        .sidebar .nav-section {
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: rgba(255,255,255,0.4);
+            padding: .8rem 1.2rem .2rem;
+        }
+        .main-content { margin-left: 250px; }
+        .topbar {
+            background: #fff;
+            border-bottom: 1px solid #dee2e6;
+            padding: .75rem 1.5rem;
+            position: sticky; top: 0; z-index: 99;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .page-content { padding: 1.5rem; }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+{% if user.is_authenticated %}
+<!-- Sidebar -->
+<nav class="sidebar d-flex flex-column">
+    <div class="brand">
+        <span class="text-white fw-bold fs-5"><i class="bi bi-box-seam me-2"></i>StockPro SN</span>
+        {% if entreprise %}<div class="text-white-50 small mt-1">{{ entreprise.nom }}</div>{% endif %}
+    </div>
+    <div class="flex-grow-1 py-2">
+        {% if user.is_superuser %}
+        <!-- Navigation superuser : gestion de la plateforme uniquement -->
+        <span class="nav-section">Plateforme</span>
+        <a href="{% url 'tenants:platform' %}" class="nav-link {% if 'platform' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-building"></i> Entreprises</a>
+        <a href="{% url 'accounts:utilisateur_liste' %}" class="nav-link {% if request.resolver_match.url_name == 'utilisateur_liste' %}active{% endif %}">
+            <i class="bi bi-people"></i> Utilisateurs</a>
+        <span class="nav-section">Système</span>
+        <a href="{% url 'admin:index' %}" class="nav-link" target="_blank">
+            <i class="bi bi-shield-lock"></i> Administration</a>
+
+        {% else %}
+        <!-- Navigation utilisateur métier -->
+        <span class="nav-section">Principal</span>
+        <a href="{% url 'dashboard:index' %}" class="nav-link {% if request.resolver_match.app_name == 'dashboard' and request.resolver_match.url_name == 'index' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i> Tableau de bord</a>
+
+        <span class="nav-section">Rapports</span>
+        <a href="{% url 'dashboard:rapport_stock' %}" class="nav-link {% if request.resolver_match.url_name == 'rapport_stock' %}active{% endif %}">
+            <i class="bi bi-bar-chart"></i> Rapport stock</a>
+        <a href="{% url 'dashboard:rapport_ventes' %}" class="nav-link {% if request.resolver_match.url_name == 'rapport_ventes' %}active{% endif %}">
+            <i class="bi bi-graph-up"></i> Rapport ventes</a>
+
+        <span class="nav-section">Stock</span>
+        <a href="{% url 'stock:inventaire' %}" class="nav-link {% if 'inventaire' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-clipboard2-data"></i> Inventaire</a>
+        <a href="{% url 'stock:produit_liste' %}" class="nav-link {% if request.resolver_match.url_name in 'produit_liste,produit_creer,produit_modifier' %}active{% endif %}">
+            <i class="bi bi-box"></i> Produits</a>
+        <a href="{% url 'stock:categorie_liste' %}" class="nav-link {% if 'categorie' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-tags"></i> Catégories</a>
+        <a href="{% url 'stock:fournisseur_liste' %}" class="nav-link {% if 'fournisseur' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-truck"></i> Fournisseurs</a>
+        <a href="{% url 'stock:mouvement_liste' %}" class="nav-link {% if 'mouvement' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-arrow-left-right"></i> Mouvements</a>
+
+        <span class="nav-section">Facturation</span>
+        <a href="{% url 'facturation:facture_liste' %}" class="nav-link {% if 'facture' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-receipt"></i> Factures</a>
+        <a href="{% url 'facturation:client_liste' %}" class="nav-link {% if 'client' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="bi bi-people"></i> Clients</a>
+        <a href="{% url 'facturation:paiement_liste' %}" class="nav-link {% if request.resolver_match.url_name == 'paiement_liste' %}active{% endif %}">
+            <i class="bi bi-cash-coin"></i> Paiements</a>
+        <a href="{% url 'facturation:creances' %}" class="nav-link {% if request.resolver_match.url_name == 'creances' %}active{% endif %}">
+            <i class="bi bi-exclamation-circle"></i> Créances</a>
+
+        <span class="nav-section">Paramètres</span>
+        <a href="{% url 'tenants:parametres' %}" class="nav-link {% if request.resolver_match.url_name == 'parametres' %}active{% endif %}">
+            <i class="bi bi-gear"></i> Mon entreprise</a>
+        {% if user.profil.est_admin %}
+        <a href="{% url 'accounts:utilisateur_liste' %}" class="nav-link {% if request.resolver_match.url_name == 'utilisateur_liste' %}active{% endif %}">
+            <i class="bi bi-person-gear"></i> Utilisateurs</a>
+        {% endif %}
+        {% endif %}
+    </div>
+    <div class="p-3 border-top border-white border-opacity-10">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="rounded-circle bg-white bg-opacity-20 d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+                 style="width:36px;height:36px;font-size:.85rem;">
+                {{ user.initiales }}
+            </div>
+            <div class="flex-grow-1 overflow-hidden">
+                <div class="text-white small text-truncate fw-semibold">{{ user.nom_complet }}</div>
+                {% if user.profil %}<div class="text-white-50" style="font-size:.7rem;">{{ user.profil.get_role_display }}</div>
+                {% elif user.is_superuser %}<div class="text-white-50" style="font-size:.7rem;">Superutilisateur</div>{% endif %}
+            </div>
+        </div>
+        <a href="{% url 'accounts:mon_profil' %}"
+           class="btn btn-sm w-100 d-flex align-items-center justify-content-center gap-2 mb-1
+                  {% if request.resolver_match.url_name == 'mon_profil' %}active{% endif %}"
+           style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);">
+            <i class="bi bi-person-gear"></i>
+            <span>Mon profil</span>
+        </a>
+        <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-sm w-100 d-flex align-items-center justify-content-center gap-2"
+                    style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25);">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Déconnexion</span>
+            </button>
+        </form>
+    </div>
+</nav>
+{% endif %}
+
+<!-- Wrapper principal -->
+<div class="{% if user.is_authenticated %}main-content{% endif %}">
+
+    {% if user.is_authenticated %}
+    <!-- Topbar -->
+    <div class="topbar d-flex align-items-center justify-content-between">
+        <h6 class="mb-0 fw-semibold text-secondary">{% block page_title %}{% endblock %}</h6>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small d-none d-md-inline">{{ user.email }}</span>
+            <form method="post" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Déconnexion</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="px-3 pt-2">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="page-content">
+    {% endif %}
+
+        {% block content %}{% endblock %}
+
+    {% if user.is_authenticated %}
+    </div>
+    {% endif %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVzdl1"
+        crossorigin="anonymous"></script>
+<script src="{% static 'js/main.js' %}"></script>
+
+{% if user.is_authenticated %}
+<!-- Avertissement expiration de session (8h = 28800s, alerte à 5 min de la fin) -->
+<div class="modal fade" id="modalSessionExpire" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-warning">
+            <div class="modal-header bg-warning text-dark py-2">
+                <h6 class="modal-title mb-0"><i class="bi bi-clock me-2"></i>Session sur le point d'expirer</h6>
+            </div>
+            <div class="modal-body text-center py-3">
+                <p class="mb-3 small">Votre session expire dans <strong id="sessionCountdown">5:00</strong>.<br>Voulez-vous rester connecté ?</p>
+                <button onclick="prolongerSession()" class="btn btn-warning btn-sm px-4">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Rester connecté
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const DUREE_SESSION = 8 * 60 * 60 * 1000;  // 8h en ms
+    const ALERTE_AVANT  = 5 * 60 * 1000;        // Alerte 5 min avant
+    const DEBUT = Date.now();
+    let modalInstance = null;
+    let countdown = null;
+
+    function afficherAlerte() {
+        const modal = document.getElementById('modalSessionExpire');
+        if (!modal) return;
+        modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
+
+        let secondesRestantes = 300;
+        clearInterval(countdown);
+        countdown = setInterval(() => {
+            secondesRestantes--;
+            const m = Math.floor(secondesRestantes / 60);
+            const s = secondesRestantes % 60;
+            const el = document.getElementById('sessionCountdown');
+            if (el) el.textContent = `${m}:${String(s).padStart(2, '0')}`;
+            if (secondesRestantes <= 0) {
+                clearInterval(countdown);
+                window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname);
+            }
+        }, 1000);
+    }
+
+    window.prolongerSession = function () {
+        fetch('/dashboard/', {credentials: 'same-origin'}).finally(() => {
+            if (modalInstance) modalInstance.hide();
+            clearInterval(countdown);
+            setTimeout(afficherAlerte, DUREE_SESSION - ALERTE_AVANT);
+        });
+    };
+
+    setTimeout(afficherAlerte, DUREE_SESSION - ALERTE_AVANT);
+})();
+</script>
+{% endif %}
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

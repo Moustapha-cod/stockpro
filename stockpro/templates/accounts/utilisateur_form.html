@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titre }} — StockPro SN{% endblock %}
+{% block page_title %}{{ titre }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+    <!-- Fil d'Ariane -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'accounts:utilisateur_liste' %}">Utilisateurs</a></li>
+            <li class="breadcrumb-item active">{{ titre }}</li>
+        </ol>
+    </nav>
+
+    <!-- ── Informations du compte ─────────────────────────────────────── -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold small">
+            <i class="bi bi-person-circle me-2 text-primary"></i>Informations du compte
+        </div>
+        <div class="card-body">
+            <form method="post" id="form-principal">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="row g-3">
+                    <!-- Prénom -->
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ form.first_name.label }}</label>
+                        {{ form.first_name }}
+                        {% if form.first_name.errors %}<div class="text-danger small mt-1">{{ form.first_name.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <!-- Nom -->
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ form.last_name.label }}</label>
+                        {{ form.last_name }}
+                        {% if form.last_name.errors %}<div class="text-danger small mt-1">{{ form.last_name.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <!-- Email -->
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ form.email.label }}</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <!-- Téléphone -->
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ form.telephone.label }}</label>
+                        {{ form.telephone }}
+                        {% if form.telephone.errors %}<div class="text-danger small mt-1">{{ form.telephone.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    {% if form.password1 %}
+                    <!-- Mot de passe (création) -->
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ form.password1.label }}</label>
+                        {{ form.password1 }}
+                        {% if form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ form.password2.label }}</label>
+                        {{ form.password2 }}
+                        {% if form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors.0 }}</div>{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Séparateur -->
+                <hr class="my-3">
+
+                <div class="row g-3">
+                    <!-- Rôle -->
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">{{ form.role.label }}</label>
+                        {{ form.role }}
+                        {% if form.role.errors %}<div class="text-danger small mt-1">{{ form.role.errors.0 }}</div>{% endif %}
+                        <div class="form-text">Détermine les droits d'accès dans l'application.</div>
+                    </div>
+
+                    <!-- Entreprise (superuser uniquement) -->
+                    {% if request.user.is_superuser %}
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold">{{ form.entreprise.label }}</label>
+                        {{ form.entreprise }}
+                        {% if form.entreprise.errors %}<div class="text-danger small mt-1">{{ form.entreprise.errors.0 }}</div>{% endif %}
+                    </div>
+                    {% else %}
+                        {{ form.entreprise }}
+                    {% endif %}
+
+                    <!-- Statut actif (modification uniquement) -->
+                    {% if form.actif %}
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold d-block">{{ form.actif.label }}</label>
+                        <div class="form-check form-switch mt-2">
+                            {{ form.actif }}
+                            <label class="form-check-label small" for="{{ form.actif.id_for_label }}">
+                                Compte actif
+                            </label>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Enregistrer
+                    </button>
+                    <a href="{% url 'accounts:utilisateur_liste' %}" class="btn btn-outline-secondary">
+                        Annuler
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── Changer le mot de passe (modification uniquement) ──────────── -->
+    {% if pwd_form %}
+    <div class="card shadow-sm border-warning">
+        <div class="card-header bg-white fw-semibold small">
+            <i class="bi bi-key me-2 text-warning"></i>Changer le mot de passe
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="changer_password" value="1">
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ pwd_form.new_password1.label }}</label>
+                        {{ pwd_form.new_password1 }}
+                        {% if pwd_form.new_password1.errors %}<div class="text-danger small mt-1">{{ pwd_form.new_password1.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">{{ pwd_form.new_password2.label }}</label>
+                        {{ pwd_form.new_password2 }}
+                        {% if pwd_form.new_password2.errors %}<div class="text-danger small mt-1">{{ pwd_form.new_password2.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-warning btn-sm">
+                        <i class="bi bi-key me-1"></i>Mettre à jour le mot de passe
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+</div>
+{% endblock %}

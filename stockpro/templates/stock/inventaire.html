@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Inventaire — StockPro SN{% endblock %}
+{% block page_title %}Inventaire{% endblock %}
+
+{% block content %}
+
+<!-- KPIs ------------------------------------------------------------------>
+<div class="row g-3 mb-3">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px;font-size:1.3rem;">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Références actives</div>
+                    <div class="fw-bold fs-5">{{ nb_total }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px;font-size:1.3rem;">
+                    <i class="bi bi-layers"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Total articles</div>
+                    <div class="fw-bold fs-5">{{ totaux.total_articles|default:0|intcomma }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px;font-size:1.3rem;">
+                    <i class="bi bi-currency-exchange"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Valeur achat</div>
+                    <div class="fw-bold fs-5">{{ totaux.valeur_achat|default:0|intcomma }} <small class="text-muted fw-normal" style="font-size:.7rem;">FCFA</small></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-danger bg-opacity-10 text-danger d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px;font-size:1.3rem;">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Alerte / Rupture</div>
+                    <div class="fw-bold fs-5">
+                        <span class="text-warning">{{ nb_alerte }}</span>
+                        <span class="text-muted fs-6"> / </span>
+                        <span class="text-danger">{{ nb_rupture }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres + actions ----------------------------------------------------->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+                       placeholder="Réf, nom, code barre, marque…">
+            </div>
+            <div class="col-md-2">
+                <select name="categorie" class="form-select form-select-sm">
+                    <option value="">Toutes catégories</option>
+                    {% for c in categories %}
+                    <option value="{{ c.pk }}" {% if categorie_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nom }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="fournisseur" class="form-select form-select-sm">
+                    <option value="">Tous fournisseurs</option>
+                    {% for f in fournisseurs %}
+                    <option value="{{ f.pk }}" {% if fournisseur_id == f.pk|stringformat:"s" %}selected{% endif %}>{{ f.nom }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="statut" class="form-select form-select-sm">
+                    <option value="">Tous statuts</option>
+                    <option value="normal"  {% if statut == 'normal'  %}selected{% endif %}>Normal</option>
+                    <option value="alerte"  {% if statut == 'alerte'  %}selected{% endif %}>Alerte</option>
+                    <option value="rupture" {% if statut == 'rupture' %}selected{% endif %}>Rupture</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+                    <i class="bi bi-funnel me-1"></i>Filtrer
+                </button>
+                <a href="{% url 'stock:inventaire' %}" class="btn btn-sm btn-outline-secondary" title="Réinitialiser">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                <a href="{% url 'stock:inventaire_export' %}?q={{ q }}&categorie={{ categorie_id }}&fournisseur={{ fournisseur_id }}&statut={{ statut }}"
+                   class="btn btn-sm btn-success" title="Télécharger CSV">
+                    <i class="bi bi-download me-1"></i>CSV
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tableau --------------------------------------------------------------->
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Référence</th>
+                    <th>Produit</th>
+                    <th>Catégorie</th>
+                    <th>Fournisseur</th>
+                    <th>Emplacement</th>
+                    <th class="text-center">Stock</th>
+                    <th class="text-center">Seuil</th>
+                    <th class="text-center">Statut</th>
+                    <th class="text-end">Prix achat</th>
+                    <th class="text-end">Prix vente</th>
+                    <th class="text-end">Valeur stock</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produits %}
+                <tr class="{% if p.en_rupture %}table-danger bg-opacity-25{% elif p.en_alerte %}table-warning bg-opacity-25{% endif %}">
+                    <td class="text-muted small">{{ p.reference }}</td>
+                    <td>
+                        <div class="fw-semibold small">{{ p.nom }}</div>
+                        {% if p.marque %}<div class="text-muted" style="font-size:.7rem;">{{ p.marque }}</div>{% endif %}
+                    </td>
+                    <td>
+                        {% if p.categorie %}
+                        <span class="badge rounded-pill"
+                              style="background:{{ p.categorie.couleur }}22;color:{{ p.categorie.couleur }};border:1px solid {{ p.categorie.couleur }}44;font-size:.72rem;">
+                            {{ p.categorie.nom }}
+                        </span>
+                        {% else %}<span class="text-muted small">—</span>{% endif %}
+                    </td>
+                    <td class="small text-muted">{{ p.fournisseur.nom|default:"—" }}</td>
+                    <td class="small text-muted">{{ p.emplacement|default:"—" }}</td>
+                    <td class="text-center fw-bold {% if p.en_rupture %}text-danger{% elif p.en_alerte %}text-warning{% else %}text-success{% endif %}">
+                        {{ p.quantite_stock }}
+                    </td>
+                    <td class="text-center text-muted small">{{ p.seuil_alerte }}</td>
+                    <td class="text-center">
+                        {% if p.en_rupture %}
+                        <span class="badge bg-danger">Rupture</span>
+                        {% elif p.en_alerte %}
+                        <span class="badge bg-warning text-dark">Alerte</span>
+                        {% else %}
+                        <span class="badge bg-success">Normal</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end small">{{ p.prix_achat|intcomma }}</td>
+                    <td class="text-end small">{{ p.prix_vente|intcomma }}</td>
+                    <td class="text-end small fw-semibold">{{ p.valeur_stock|intcomma }}</td>
+                    <td class="text-center">
+                        <a href="{% url 'stock:produit_modifier' p.pk %}"
+                           class="btn btn-sm btn-outline-primary py-0 px-2" title="Modifier">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'stock:mouvement_creer' %}?produit={{ p.pk }}"
+                           class="btn btn-sm btn-outline-success py-0 px-2 ms-1" title="Saisir un mouvement">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        Aucun produit trouvé
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if produits %}
+            <tfoot class="table-light fw-bold">
+                <tr>
+                    <td colspan="5" class="small">Total ({{ nb_total }} références)</td>
+                    <td class="text-center">{{ totaux.total_articles|default:0|intcomma }}</td>
+                    <td colspan="4"></td>
+                    <td class="text-end small">{{ totaux.valeur_achat|default:0|intcomma }} FCFA</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}

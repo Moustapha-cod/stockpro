@@ -1,0 +1,370 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ facture.numero }} — StockPro SN{% endblock %}
+{% block page_title %}{{ facture.numero }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .paiement-type-btn { cursor: pointer; transition: all .15s; }
+    .paiement-type-btn.active { box-shadow: 0 0 0 2px #0d6efd; }
+    .timeline-paiement { position: relative; padding-left: 1.5rem; }
+    .timeline-paiement::before {
+        content: ''; position: absolute; left: .45rem; top: 0; bottom: 0;
+        width: 2px; background: #dee2e6;
+    }
+    .timeline-item { position: relative; margin-bottom: 1rem; }
+    .timeline-dot {
+        position: absolute; left: -1.15rem; top: .25rem;
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #198754; border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #198754;
+    }
+    .timeline-dot.credit { background: #fd7e14; box-shadow: 0 0 0 2px #fd7e14; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+    <!-- ══ Colonne principale ══════════════════════════════════════════════ -->
+    <div class="col-lg-8">
+
+        <!-- En-tête -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="row align-items-start">
+                    <div class="col-md-5">
+                        <div class="text-muted small mb-1">Client</div>
+                        <div class="fw-bold fs-5">{{ facture.client.nom }}</div>
+                        {% if facture.client.telephone %}<div class="text-muted small"><i class="bi bi-telephone me-1"></i>{{ facture.client.telephone }}</div>{% endif %}
+                        {% if facture.client.ville %}<div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>{{ facture.client.ville }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">Émise le</div>
+                        <div class="fw-semibold">{{ facture.date_emission|date:"d/m/Y" }}</div>
+                        {% if facture.date_echeance %}
+                        <div class="text-muted small mt-2">Échéance</div>
+                        <div class="fw-semibold {% if facture.est_en_retard %}text-danger{% endif %}">
+                            {{ facture.date_echeance|date:"d/m/Y" }}
+                            {% if facture.est_en_retard %}<span class="badge bg-danger ms-1">En retard</span>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if facture.objet %}<div class="text-muted small mt-2">{{ facture.objet }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <span class="badge fs-6
+                            {% if facture.statut == 'payee' %}bg-success
+                            {% elif facture.statut == 'partielle' %}bg-warning text-dark
+                            {% elif facture.statut == 'annulee' %}bg-secondary
+                            {% elif facture.statut == 'brouillon' %}bg-light text-dark border
+                            {% else %}bg-primary{% endif %}">
+                            {{ facture.get_statut_display }}
+                        </span>
+                        <div class="mt-2 d-flex gap-1 justify-content-end flex-wrap">
+                            <a href="{% url 'facturation:facture_imprimer' facture.pk %}" class="btn btn-sm btn-outline-primary" title="Imprimer / PDF" target="_blank"><i class="bi bi-printer me-1"></i>Imprimer</a>
+                            {% if facture.statut != 'annulee' %}
+                            <a href="{% url 'facturation:facture_modifier' facture.pk %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'facturation:facture_annuler' facture.pk %}" class="btn btn-sm btn-outline-danger" title="Annuler"><i class="bi bi-x-circle"></i></a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lignes de facture -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold small">
+                <i class="bi bi-list-ul me-2 text-primary"></i>Lignes de facture
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Désignation</th>
+                            <th>Réf.</th>
+                            <th class="text-center">Qté</th>
+                            <th class="text-end">PU HT</th>
+                            <th class="text-center">Remise</th>
+                            <th class="text-end">Total HT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ligne in lignes %}
+                        <tr>
+                            <td class="fw-semibold small">{{ ligne.designation }}</td>
+                            <td class="small text-muted">{{ ligne.reference|default:"—" }}</td>
+                            <td class="text-center small">{{ ligne.quantite }}</td>
+                            <td class="text-end small">{{ ligne.prix_unitaire_ht|intcomma }}</td>
+                            <td class="text-center small">{% if ligne.remise %}{{ ligne.remise }}%{% else %}—{% endif %}</td>
+                            <td class="text-end small fw-semibold">{{ ligne.montant_ht|floatformat:0|intcomma }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted py-3">Aucune ligne</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer bg-white">
+                <div class="row justify-content-end">
+                    <div class="col-md-5">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted small">Sous-total HT</td><td class="text-end small">{{ facture.montant_ht|intcomma }} FCFA</td></tr>
+                            {% if facture.remise_globale %}<tr><td class="text-muted small">Remise ({{ facture.remise_globale }}%)</td><td class="text-end small text-danger">incluse</td></tr>{% endif %}
+                            <tr><td class="text-muted small">TVA ({{ facture.taux_tva }}%)</td><td class="text-end small">{{ facture.montant_tva|intcomma }} FCFA</td></tr>
+                            <tr class="fw-bold border-top"><td>Total TTC</td><td class="text-end text-primary fs-6">{{ facture.montant_ttc|intcomma }} FCFA</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historique des paiements -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold small"><i class="bi bi-clock-history me-2 text-success"></i>Historique des paiements</span>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                    {{ facture.montant_paye|intcomma }} / {{ facture.montant_ttc|intcomma }} FCFA
+                </span>
+            </div>
+            <div class="card-body {% if not paiements %}py-3{% endif %}">
+                {% if paiements %}
+                <div class="timeline-paiement">
+                    {% for p in paiements %}
+                    <div class="timeline-item">
+                        <div class="timeline-dot {% if p.mode_paiement == 'credit' %}credit{% endif %}"></div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold small">{{ p.montant|intcomma }} FCFA</div>
+                                <div class="text-muted" style="font-size:.78rem;">
+                                    {{ p.get_mode_paiement_display }} · {{ p.date_paiement|date:"d/m/Y" }}
+                                    {% if p.reference_paiement %} · <span class="text-info">{{ p.reference_paiement }}</span>{% endif %}
+                                    {% if p.cree_par %} · par {{ p.cree_par.nom_complet }}{% endif %}
+                                </div>
+                                {% if p.notes %}<div class="text-muted fst-italic" style="font-size:.75rem;">{{ p.notes }}</div>{% endif %}
+                            </div>
+                            {% if facture.statut != 'annulee' %}
+                            <form method="post" action="{% url 'facturation:paiement_supprimer' p.pk %}"
+                                  onsubmit="return confirm('Supprimer ce paiement de {{ p.montant|intcomma }} FCFA ?')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Supprimer">
+                                    <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center small mb-0 py-2">
+                    <i class="bi bi-dash-circle me-1"></i>Aucun paiement enregistré
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ══ Colonne latérale ════════════════════════════════════════════════ -->
+    <div class="col-lg-4">
+
+        <!-- Récap financier -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-muted small">Total TTC</span>
+                    <span class="fw-bold">{{ facture.montant_ttc|intcomma }} FCFA</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-muted small">Déjà payé</span>
+                    <span class="text-success fw-semibold">{{ facture.montant_paye|intcomma }} FCFA</span>
+                </div>
+                <hr class="my-2">
+                <div class="d-flex justify-content-between">
+                    <span class="fw-bold">Reste dû</span>
+                    <span class="fw-bold fs-6 {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ facture.montant_restant|intcomma }} FCFA
+                    </span>
+                </div>
+                {% if facture.montant_ttc > 0 %}
+                <div class="progress mt-3" style="height:8px;">
+                    <div class="progress-bar bg-success" style="width:{{ facture.taux_paiement }}%"></div>
+                </div>
+                <div class="text-muted small text-end mt-1">{{ facture.taux_paiement }}% payé</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ── Enregistrer un paiement ──────────────────────────────── -->
+        {% if peut_payer %}
+        <div class="card shadow-sm" id="paiement">
+            <div class="card-header bg-white fw-semibold small">
+                <i class="bi bi-cash-coin me-2 text-success"></i>Enregistrer un paiement
+            </div>
+            <div class="card-body p-3">
+
+                <!-- Boutons de type rapide -->
+                <div class="mb-3">
+                    <div class="small text-muted fw-semibold mb-2">Type de paiement</div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-success flex-grow-1 paiement-type-btn active"
+                                onclick="setType('integral', this)">
+                            <i class="bi bi-check-circle me-1"></i>Intégral
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 paiement-type-btn"
+                                onclick="setType('tranche', this)">
+                            <i class="bi bi-pie-chart me-1"></i>Tranche
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1 paiement-type-btn"
+                                onclick="setType('dette', this)">
+                            <i class="bi bi-hourglass me-1"></i>Dette
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Montants rapides (tranche) -->
+                <div id="tranches-rapides" class="mb-3" style="display:none;">
+                    <div class="small text-muted fw-semibold mb-1">Montant rapide</div>
+                    <div class="d-flex gap-1 flex-wrap">
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
+                                onclick="setMontant({{ facture.montant_restant|floatformat:0 }} * 0.25)">25%</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
+                                onclick="setMontant({{ facture.montant_restant|floatformat:0 }} * 0.50)">50%</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
+                                onclick="setMontant({{ facture.montant_restant|floatformat:0 }} * 0.75)">75%</button>
+                    </div>
+                </div>
+
+                <!-- Paiement intégral rapide -->
+                <div id="form-integral">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Mode de paiement</label>
+                            <select name="mode_integral" class="form-select form-select-sm">
+                                {% for val, label in modes %}
+                                <option value="{{ val }}" {% if val == facture.mode_paiement %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" name="payer_integral" value="1"
+                                class="btn btn-success btn-sm w-100">
+                            <i class="bi bi-check-circle me-1"></i>Solder — {{ facture.montant_restant|intcomma }} FCFA
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Paiement partiel / dette -->
+                <div id="form-tranche" style="display:none;">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Montant (FCFA) *</label>
+                            <input type="number" name="montant" id="montant-input"
+                                   class="form-control form-control-sm"
+                                   value="{{ facture.montant_restant|floatformat:0 }}"
+                                   min="1" max="{{ facture.montant_restant|floatformat:0 }}" required>
+                            <div class="text-muted small mt-1">Restant : {{ facture.montant_restant|intcomma }} FCFA</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Mode de paiement</label>
+                            {{ paiement_form.mode_paiement }}
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Date</label>
+                            {{ paiement_form.date_paiement }}
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Référence</label>
+                            {{ paiement_form.reference_paiement }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Notes</label>
+                            {{ paiement_form.notes }}
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm w-100" id="btn-valider">
+                            <i class="bi bi-check-lg me-1"></i>Valider le paiement
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+        {% else %}
+        {% if facture.statut == 'payee' %}
+        <div class="alert alert-success d-flex align-items-center gap-2">
+            <i class="bi bi-check-circle-fill fs-5"></i>
+            <div><strong>Facture soldée</strong><br><small>Tous les paiements ont été reçus.</small></div>
+        </div>
+        {% elif facture.statut == 'annulee' %}
+        <div class="alert alert-secondary d-flex align-items-center gap-2">
+            <i class="bi bi-x-circle-fill fs-5"></i>
+            <div><strong>Facture annulée</strong></div>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <!-- Solde global client -->
+        <div class="card shadow-sm mt-3 border-0 bg-light">
+            <div class="card-body py-2 px-3">
+                <div class="small text-muted">Solde dû par {{ facture.client.nom }}</div>
+                <div class="fw-bold {% if facture.client.solde_du > 0 %}text-danger{% else %}text-success{% endif %}">
+                    {{ facture.client.solde_du|intcomma }} FCFA
+                </div>
+                <div class="small text-muted">sur {{ facture.client.nombre_factures }} facture{{ facture.client.nombre_factures|pluralize }}</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const montantRestant = {{ facture.montant_restant|floatformat:0 }};
+
+function setType(type, btn) {
+    // Reset boutons
+    document.querySelectorAll('.paiement-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const formIntegral = document.getElementById('form-integral');
+    const formTranche  = document.getElementById('form-tranche');
+    const tranchesRapides = document.getElementById('tranches-rapides');
+    const btnValider   = document.getElementById('btn-valider');
+    const montantInput = document.getElementById('montant-input');
+
+    if (type === 'integral') {
+        formIntegral.style.display  = '';
+        formTranche.style.display   = 'none';
+        tranchesRapides.style.display = 'none';
+    } else if (type === 'tranche') {
+        formIntegral.style.display  = 'none';
+        formTranche.style.display   = '';
+        tranchesRapides.style.display = '';
+        if (montantInput) montantInput.value = montantRestant;
+        if (btnValider) { btnValider.className = 'btn btn-primary btn-sm w-100'; btnValider.innerHTML = '<i class="bi bi-check-lg me-1"></i>Valider le paiement'; }
+    } else if (type === 'dette') {
+        formIntegral.style.display  = 'none';
+        formTranche.style.display   = '';
+        tranchesRapides.style.display = 'none';
+        if (montantInput) montantInput.value = montantRestant;
+        // Mode crédit
+        const modeSelect = document.querySelector('[name="mode_paiement"]');
+        if (modeSelect) {
+            for (let opt of modeSelect.options) {
+                if (opt.value === 'credit') { modeSelect.value = 'credit'; break; }
+            }
+        }
+        if (btnValider) { btnValider.className = 'btn btn-warning btn-sm w-100 text-dark'; btnValider.innerHTML = '<i class="bi bi-hourglass me-1"></i>Enregistrer la dette'; }
+    }
+}
+
+function setMontant(val) {
+    const input = document.getElementById('montant-input');
+    if (input) input.value = Math.round(val);
+}
+</script>
+{% endblock %}

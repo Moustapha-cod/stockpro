@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Rapport de stock — StockPro SN{% endblock %}
+{% block page_title %}Rapport de stock{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <a href="{% url 'dashboard:rapport_stock_export' %}" class="btn btn-sm btn-success">
+        <i class="bi bi-download me-1"></i>Télécharger CSV
+    </a>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center" style="width:52px;height:52px;font-size:1.4rem;"><i class="bi bi-box-seam"></i></div>
+                <div>
+                    <div class="text-muted small">Produits actifs</div>
+                    <div class="fw-bold fs-5">{{ totaux.total_produits|default:0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center" style="width:52px;height:52px;font-size:1.4rem;"><i class="bi bi-layers"></i></div>
+                <div>
+                    <div class="text-muted small">Total articles</div>
+                    <div class="fw-bold fs-5">{{ totaux.total_articles|default:0|intcomma }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center" style="width:52px;height:52px;font-size:1.4rem;"><i class="bi bi-currency-dollar"></i></div>
+                <div>
+                    <div class="text-muted small">Valeur stock (achat)</div>
+                    <div class="fw-bold fs-5">{{ totaux.valeur_achat|default:0|intcomma }} <small class="text-muted fs-6">FCFA</small></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-3 bg-danger bg-opacity-10 text-danger d-flex align-items-center justify-content-center" style="width:52px;height:52px;font-size:1.4rem;"><i class="bi bi-exclamation-triangle"></i></div>
+                <div>
+                    <div class="text-muted small">Alertes / Ruptures</div>
+                    <div class="fw-bold fs-5">
+                        <span class="text-warning">{{ nb_alertes }}</span>
+                        <span class="text-muted fs-6"> / </span>
+                        <span class="text-danger">{{ nb_ruptures }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Valeur par catégorie (graphique) -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold small"><i class="bi bi-pie-chart me-2 text-primary"></i>Valeur stock par catégorie</div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                {% if data_cat != '[]' %}
+                <canvas id="chartCat" style="max-height:260px;"></canvas>
+                {% else %}
+                <p class="text-muted small">Aucune donnée</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau par catégorie -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold small"><i class="bi bi-table me-2 text-primary"></i>Détail par catégorie</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Catégorie</th>
+                            <th class="text-center">Produits</th>
+                            <th class="text-center">Articles</th>
+                            <th class="text-end">Valeur (FCFA)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in par_categorie %}
+                        <tr>
+                            <td>
+                                <span class="badge rounded-pill" style="background:{{ row.categorie__couleur|default:'#6c757d' }}20;color:{{ row.categorie__couleur|default:'#6c757d' }};border:1px solid {{ row.categorie__couleur|default:'#6c757d' }}40;">
+                                    {{ row.categorie__nom|default:"Sans catégorie" }}
+                                </span>
+                            </td>
+                            <td class="text-center small">{{ row.nb_produits }}</td>
+                            <td class="text-center small">{{ row.total_articles|default:0 }}</td>
+                            <td class="text-end small fw-semibold">{{ row.valeur|default:0|intcomma }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted py-3">Aucune donnée</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Top 10 produits par valeur -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold small"><i class="bi bi-trophy me-2 text-warning"></i>Top 10 produits (valeur stock)</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr><th>Produit</th><th class="text-center">Qté</th><th class="text-end">Valeur</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for p in top_valeur %}
+                        <tr>
+                            <td>
+                                <div class="small fw-semibold">{{ p.nom }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">{{ p.reference }}</div>
+                            </td>
+                            <td class="text-center small">{{ p.quantite_stock }}</td>
+                            <td class="text-end small fw-semibold">{{ p.valeur_stock|default:0|intcomma }} FCFA</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center text-muted py-3">Aucun produit</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mouvements 30 derniers jours -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold small"><i class="bi bi-arrow-left-right me-2 text-primary"></i>Mouvements (30 derniers jours)</div>
+            <div class="card-body">
+                {% for m in mouvements_par_type %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge rounded-pill
+                        {% if m.type_mouvement == 'entree' %}bg-success
+                        {% elif m.type_mouvement == 'sortie' %}bg-danger
+                        {% elif m.type_mouvement == 'ajustement' %}bg-info text-dark
+                        {% elif m.type_mouvement == 'retour' %}bg-warning text-dark
+                        {% else %}bg-secondary{% endif %}" style="min-width:110px;">
+                        {{ m.type_mouvement|capfirst }}
+                    </span>
+                    <span class="text-muted small">{{ m.nb }} opération{{ m.nb|pluralize }}</span>
+                    <span class="fw-semibold small">{{ m.total_qte|default:0 }} unités</span>
+                </div>
+                {% empty %}
+                <p class="text-muted text-center small py-3">Aucun mouvement sur 30 jours</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Produits en rupture -->
+{% if ruptures %}
+<div class="card shadow-sm mb-3 border-danger border-opacity-25">
+    <div class="card-header bg-danger bg-opacity-10 fw-semibold small text-danger">
+        <i class="bi bi-x-circle me-2"></i>Produits en rupture de stock ({{ nb_ruptures }})
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+                <tr><th>Référence</th><th>Produit</th><th>Catégorie</th><th>Fournisseur</th></tr>
+            </thead>
+            <tbody>
+                {% for p in ruptures %}
+                <tr>
+                    <td class="text-muted small">{{ p.reference }}</td>
+                    <td class="fw-semibold small">{{ p.nom }}</td>
+                    <td class="small">{{ p.categorie.nom|default:"—" }}</td>
+                    <td class="small">{{ p.fournisseur.nom|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Produits en alerte -->
+{% if alertes %}
+<div class="card shadow-sm border-warning border-opacity-25">
+    <div class="card-header bg-warning bg-opacity-10 fw-semibold small text-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>Produits en alerte ({{ nb_alertes }})
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+                <tr><th>Référence</th><th>Produit</th><th class="text-center">Stock</th><th class="text-center">Seuil</th><th>Catégorie</th></tr>
+            </thead>
+            <tbody>
+                {% for p in alertes %}
+                <tr>
+                    <td class="text-muted small">{{ p.reference }}</td>
+                    <td class="fw-semibold small">{{ p.nom }}</td>
+                    <td class="text-center text-warning fw-bold">{{ p.quantite_stock }}</td>
+                    <td class="text-center text-muted small">{{ p.seuil_alerte }}</td>
+                    <td class="small">{{ p.categorie.nom|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const labelsCat = {{ labels_cat|safe }};
+const dataCat = {{ data_cat|safe }};
+const couleursCat = {{ couleurs_cat|safe }};
+
+if (labelsCat.length > 0) {
+    new Chart(document.getElementById('chartCat'), {
+        type: 'doughnut',
+        data: {
+            labels: labelsCat,
+            datasets: [{
+                data: dataCat,
+                backgroundColor: couleursCat.map(c => c + '99'),
+                borderColor: couleursCat,
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+            cutout: '55%'
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titre }} — StockPro SN{% endblock %}
+{% block page_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .formset-row td { vertical-align: middle; }
+    .ligne-total { font-weight: 600; min-width: 100px; text-align: right; }
+    #lignes-table th, #lignes-table td { padding: .4rem .5rem; }
+    #lignes-table .form-control-sm,
+    #lignes-table .form-select-sm { font-size: .82rem; }
+    #lignes-table .col-produit  { min-width: 220px; }
+    #lignes-table .col-design   { min-width: 200px; }
+    #lignes-table .col-qte      { width: 80px; }
+    #lignes-table .col-prix     { width: 120px; }
+    #lignes-table .col-remise   { width: 90px; }
+    #lignes-table .col-total    { width: 130px; }
+    #lignes-table .col-action   { width: 48px; }
+    .resume-card .row-item {
+        display: flex;
+        justify-content: space-between;
+        padding: .3rem 0;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: .9rem;
+    }
+    .resume-card .row-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="facture-form">
+{% csrf_token %}
+
+<!-- ── Ligne 1 : Informations ─────────────────────────────────────────── -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-receipt me-2 text-primary"></i>Informations de la facture
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Client <span class="text-danger">*</span></label>
+                {{ form.client }}
+                {% if form.client.errors %}<div class="text-danger small mt-1">{{ form.client.errors }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Objet</label>
+                {{ form.objet }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Date d'émission</label>
+                {{ form.date_emission }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Date d'échéance</label>
+                {{ form.date_echeance }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Mode de paiement</label>
+                {{ form.mode_paiement }}
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Remise globale (%)</label>
+                {{ form.remise_globale }}
+            </div>
+            <div class="col-md-7">
+                <label class="form-label">Notes</label>
+                {{ form.notes }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Ligne 2 : Lignes de facturation (pleine largeur) ──────────────── -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between">
+        <span class="fw-semibold"><i class="bi bi-list-ul me-2 text-primary"></i>Lignes de facturation</span>
+        <button type="button" id="btn-add-ligne" class="btn btn-sm btn-outline-primary py-0">
+            <i class="bi bi-plus-lg me-1"></i>Ajouter une ligne
+        </button>
+    </div>
+    <div class="card-body p-0">
+        {{ formset.management_form }}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0" id="lignes-table">
+                <thead class="table-light">
+                    <tr>
+                        <th class="col-produit">Produit</th>
+                        <th class="col-design">Désignation libre</th>
+                        <th class="col-qte text-center">Qté</th>
+                        <th class="col-prix">Prix unit. HT</th>
+                        <th class="col-remise text-center">Remise %</th>
+                        <th class="col-total text-end">Total HT</th>
+                        <th class="col-action"></th>
+                    </tr>
+                </thead>
+                <tbody id="lignes-body">
+                    {% for ligne_form in formset %}
+                    <tr class="formset-row {% if ligne_form.instance.pk %}existing-row{% endif %}" data-index="{{ forloop.counter0 }}">
+                        <td class="col-produit">{{ ligne_form.produit }}{{ ligne_form.id }}</td>
+                        <td class="col-design">{{ ligne_form.designation }}</td>
+                        <td class="col-qte">{{ ligne_form.quantite }}</td>
+                        <td class="col-prix">{{ ligne_form.prix_unitaire_ht }}</td>
+                        <td class="col-remise">{{ ligne_form.remise }}</td>
+                        <td class="col-total"><span class="ligne-total">—</span></td>
+                        <td class="col-action text-center">
+                            {% if ligne_form.instance.pk %}
+                                <div style="display:none">{{ ligne_form.DELETE }}</div>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 btn-delete-ligne" title="Supprimer cette ligne">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── Ligne 3 : Résumé + boutons (droite) ──────────────────────────── -->
+<div class="row justify-content-end">
+    <div class="col-lg-4 col-md-6">
+        <div class="card shadow-sm resume-card mb-3">
+            <div class="card-body">
+                <div class="row-item">
+                    <span class="text-muted">TVA (%)</span>
+                    <span style="width:90px">{{ form.taux_tva }}</span>
+                </div>
+                <div class="row-item">
+                    <span class="text-muted">Total HT</span>
+                    <span id="total-ht" class="fw-semibold">—</span>
+                </div>
+                <div class="row-item">
+                    <span class="text-muted">TVA</span>
+                    <span id="total-tva">—</span>
+                </div>
+                <div class="row-item fw-bold fs-6 mt-1">
+                    <span>Total TTC</span>
+                    <span id="total-ttc" class="text-primary">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg me-1"></i>Enregistrer la facture
+            </button>
+            <a href="{% url 'facturation:facture_liste' %}" class="btn btn-outline-secondary">Annuler</a>
+        </div>
+    </div>
+</div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Formatage ──────────────────────────────────────────────────────────
+function fmt(n) {
+    return n > 0 ? Math.round(n).toLocaleString('fr-FR') + ' FCFA' : '—';
+}
+
+// ── Recalcul totaux ────────────────────────────────────────────────────
+function recalculer() {
+    let totalHT = 0;
+    document.querySelectorAll('.formset-row').forEach(function(row) {
+        if (row.dataset.deleted === '1') return;
+        const qte    = parseFloat(row.querySelector('.ligne-qte')?.value)       || 0;
+        const pu     = parseFloat(row.querySelector('.ligne-prix')?.value)       || 0;
+        const remise = parseFloat(row.querySelector('[id$="-remise"]')?.value)   || 0;
+        const ht     = qte * pu * (1 - remise / 100);
+        totalHT += ht;
+        const span = row.querySelector('.ligne-total');
+        if (span) span.textContent = fmt(ht);
+    });
+
+    const remiseGlob = parseFloat(document.querySelector('[name$="remise_globale"]')?.value) || 0;
+    totalHT = totalHT * (1 - remiseGlob / 100);
+
+    const tva        = parseFloat(document.querySelector('[name$="taux_tva"]')?.value) || 18;
+    const montantTVA = totalHT * tva / 100;
+    const ttc        = totalHT + montantTVA;
+
+    document.getElementById('total-ht').textContent  = fmt(totalHT);
+    document.getElementById('total-tva').textContent = fmt(montantTVA);
+    document.getElementById('total-ttc').textContent = fmt(ttc);
+}
+
+// ── Suppression d'une ligne ────────────────────────────────────────────
+function supprimerLigne(btn) {
+    const row = btn.closest('tr');
+    const cb  = row.querySelector('input[type=checkbox][id$="-DELETE"]');
+
+    if (cb) {
+        // Ligne existante en base → cocher DELETE et masquer visuellement
+        cb.checked = true;
+        row.dataset.deleted = '1';
+        row.style.opacity = '0.35';
+        row.style.textDecoration = 'line-through';
+        row.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), select').forEach(function(el) {
+            el.disabled = true;
+        });
+        // Transformer le bouton en "annuler"
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+        btn.title = 'Annuler';
+        btn.classList.replace('btn-outline-danger', 'btn-outline-secondary');
+        btn.onclick = function() { restaurerLigne(btn); };
+    } else {
+        // Nouvelle ligne (pas en base) → retirer du DOM
+        row.remove();
+        totalForms--;
+        document.getElementById('id_lignes-TOTAL_FORMS').value = totalForms;
+    }
+    recalculer();
+}
+
+function restaurerLigne(btn) {
+    const row = btn.closest('tr');
+    const cb  = row.querySelector('input[type=checkbox][id$="-DELETE"]');
+    cb.checked = false;
+    row.dataset.deleted = '0';
+    row.style.opacity = '';
+    row.style.textDecoration = '';
+    row.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), select').forEach(function(el) {
+        el.disabled = false;
+    });
+    btn.innerHTML = '<i class="bi bi-trash"></i>';
+    btn.title = 'Supprimer cette ligne';
+    btn.classList.replace('btn-outline-secondary', 'btn-outline-danger');
+    btn.onclick = function() { supprimerLigne(btn); };
+    recalculer();
+}
+
+// ── Attacher les boutons de suppression ───────────────────────────────
+function attachDeleteBtn(btn) {
+    btn.onclick = function() { supprimerLigne(btn); };
+}
+
+document.querySelectorAll('.btn-delete-ligne').forEach(attachDeleteBtn);
+
+// ── Listeners recalcul ────────────────────────────────────────────────
+function attachListeners(row) {
+    row.querySelectorAll('input, select').forEach(function(el) {
+        el.addEventListener('input', recalculer);
+        el.addEventListener('change', recalculer);
+    });
+}
+document.querySelectorAll('.formset-row').forEach(attachListeners);
+document.querySelector('[name$="remise_globale"]')?.addEventListener('input', recalculer);
+document.querySelector('[name$="taux_tva"]')?.addEventListener('input', recalculer);
+
+// ── Ajout dynamique de lignes ─────────────────────────────────────────
+let totalForms = parseInt(document.getElementById('id_lignes-TOTAL_FORMS')?.value || 0);
+
+document.getElementById('btn-add-ligne')?.addEventListener('click', function() {
+    const tbody    = document.getElementById('lignes-body');
+    const template = tbody.querySelector('.formset-row');
+    if (!template) return;
+
+    const newRow = template.cloneNode(true);
+    newRow.classList.remove('existing-row');
+    newRow.dataset.deleted = '0';
+    newRow.style.opacity = '';
+    newRow.style.textDecoration = '';
+
+    // Mettre à jour les index Django
+    newRow.querySelectorAll('[name],[id]').forEach(function(el) {
+        ['name', 'id', 'for'].forEach(function(attr) {
+            const val = el.getAttribute(attr);
+            if (val) el.setAttribute(attr, val.replace(/-\d+-/, '-' + totalForms + '-'));
+        });
+    });
+
+    // Vider les valeurs
+    newRow.querySelectorAll('input:not([type=hidden])').forEach(function(el) {
+        el.value = '';
+        el.disabled = false;
+    });
+    newRow.querySelectorAll('select').forEach(function(el) {
+        el.selectedIndex = 0;
+        el.disabled = false;
+    });
+    const totalSpan = newRow.querySelector('.ligne-total');
+    if (totalSpan) totalSpan.textContent = '—';
+
+    // Supprimer la checkbox DELETE cachée (pas encore en base)
+    const hiddenDelete = newRow.querySelector('input[type=checkbox][id$="-DELETE"]');
+    if (hiddenDelete) hiddenDelete.closest('div')?.remove();
+
+    // Rebinder le bouton delete
+    const delBtn = newRow.querySelector('.btn-delete-ligne');
+    if (delBtn) {
+        delBtn.innerHTML = '<i class="bi bi-trash"></i>';
+        delBtn.title = 'Supprimer cette ligne';
+        delBtn.classList.remove('btn-outline-secondary');
+        delBtn.classList.add('btn-outline-danger');
+        attachDeleteBtn(delBtn);
+    }
+
+    tbody.appendChild(newRow);
+    totalForms++;
+    document.getElementById('id_lignes-TOTAL_FORMS').value = totalForms;
+    attachListeners(newRow);
+});
+
+recalculer();
+</script>
+{% endblock %}

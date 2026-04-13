@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Tableau de bord — StockPro SN{% endblock %}
+{% block page_title %}Tableau de bord{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kpi-card { border: none; border-radius: 12px; transition: transform .15s; }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.1); }
+    .kpi-icon {
+        width: 52px; height: 52px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem;
+    }
+    .evolution-badge { font-size: .75rem; font-weight: 600; }
+    .badge-alerte { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    .badge-rupture { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+    .badge-normal { background: #d1e7dd; color: #0a3622; border: 1px solid #badbcc; }
+    .table-hover tbody tr:hover { background: #f0f4ff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Sélecteur de période -->
+<div class="card shadow-sm mb-4 border-0">
+    <div class="card-body py-2 px-3">
+        <form method="get" class="d-flex flex-wrap align-items-center gap-2">
+
+            <!-- Boutons rapides -->
+            <div class="btn-group btn-group-sm flex-shrink-0">
+                <a href="?periode=today"
+                   class="btn {% if periode == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    Aujourd'hui
+                </a>
+                <a href="?periode=7"
+                   class="btn {% if periode == '7' %}btn-primary{% else %}btn-outline-secondary{% endif %}">7j</a>
+                <a href="?periode=30"
+                   class="btn {% if periode == '30' %}btn-primary{% else %}btn-outline-secondary{% endif %}">30j</a>
+                <a href="?periode=90"
+                   class="btn {% if periode == '90' %}btn-primary{% else %}btn-outline-secondary{% endif %}">90j</a>
+                <a href="?periode=365"
+                   class="btn {% if periode == '365' %}btn-primary{% else %}btn-outline-secondary{% endif %}">1 an</a>
+            </div>
+
+            <!-- Séparateur -->
+            <span class="text-muted small flex-shrink-0">ou</span>
+
+            <!-- Période personnalisée -->
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                <input type="date" name="date_debut" value="{{ date_debut }}"
+                       class="form-control form-control-sm" style="width:140px;">
+                <span class="text-muted small">→</span>
+                <input type="date" name="date_fin" value="{{ date_fin }}"
+                       class="form-control form-control-sm" style="width:140px;">
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="bi bi-funnel"></i>
+                </button>
+                {% if date_debut or periode == 'today' %}
+                <a href="{% url 'dashboard:index' %}" class="btn btn-sm btn-outline-secondary" title="Réinitialiser">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Libellé période active -->
+            <span class="text-muted small ms-auto">
+                {% if periode == 'today' %}
+                    Aujourd'hui
+                {% elif date_debut %}
+                    Du {{ date_debut }} au {{ date_fin|default:"aujourd'hui" }}
+                {% else %}
+                    {{ jours }} derniers jours
+                {% endif %}
+            </span>
+
+        </form>
+    </div>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+    <!-- Chiffre d'affaires -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="text-muted small">Chiffre d'affaires</div>
+                    <div class="fw-bold fs-5">{{ ca_periode|intcomma }} FCFA</div>
+                    <span class="evolution-badge {% if evolution_ca >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if evolution_ca >= 0 %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %}
+                        {{ evolution_ca|floatformat:1 }}% vs période préc.
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ventes -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-receipt"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Factures émises</div>
+                    <div class="fw-bold fs-5">{{ nb_ventes }}</div>
+                    <span class="text-muted small">sur la période</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Valeur stock -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Valeur du stock</div>
+                    <div class="fw-bold fs-5">{{ valeur_stock|intcomma }} FCFA</div>
+                    <span class="text-muted small">{{ nb_articles|intcomma }} articles</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Créances -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Créances impayées</div>
+                    <div class="fw-bold fs-5">{{ creances|intcomma }} FCFA</div>
+                    <span class="text-muted small">{{ nb_factures_impayees }} facture{{ nb_factures_impayees|pluralize }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-bottom fw-semibold">
+                <i class="bi bi-bar-chart-line text-primary me-2"></i>Ventes journalières (FCFA)
+            </div>
+            <div class="card-body">
+                <canvas id="chartVentes" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-bottom fw-semibold">
+                <i class="bi bi-pie-chart text-success me-2"></i>Répartition par catégorie
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                {% if data_categories != '[]' %}
+                <canvas id="chartCategories" height="200"></canvas>
+                {% else %}
+                <p class="text-muted text-center small">Aucune donnée sur la période</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top produits + Alertes stock + Dernières factures -->
+<div class="row g-3">
+    <!-- Top produits -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-bottom fw-semibold">
+                <i class="bi bi-trophy text-warning me-2"></i>Top 5 produits vendus
+            </div>
+            <div class="card-body p-0">
+                {% if top_produits %}
+                <ul class="list-group list-group-flush">
+                    {% for p in top_produits %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                        <div>
+                            <div class="fw-semibold small">{{ p.produit__nom }}</div>
+                            <div class="text-muted" style="font-size:.75rem;">{{ p.produit__reference }}</div>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">{{ p.total_vendu }} u.</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted text-center small p-3">Aucune vente sur la période</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertes stock -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-bottom fw-semibold">
+                <i class="bi bi-exclamation-triangle text-danger me-2"></i>Alertes stock
+            </div>
+            <div class="card-body p-0">
+                {% if produits_alerte %}
+                <ul class="list-group list-group-flush">
+                    {% for p in produits_alerte %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                        <div>
+                            <div class="fw-semibold small">{{ p.nom }}</div>
+                            <div class="text-muted" style="font-size:.75rem;">{{ p.reference }}</div>
+                        </div>
+                        <span class="badge rounded-pill {% if p.en_rupture %}badge-rupture{% else %}badge-alerte{% endif %}">
+                            {% if p.en_rupture %}Rupture{% else %}{{ p.quantite_stock }} / {{ p.seuil_alerte }}{% endif %}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-success text-center small p-3"><i class="bi bi-check-circle me-1"></i>Aucune alerte</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Dernières factures -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-bottom fw-semibold">
+                <i class="bi bi-clock-history text-secondary me-2"></i>Dernières factures
+            </div>
+            <div class="card-body p-0">
+                {% if dernieres_factures %}
+                <ul class="list-group list-group-flush">
+                    {% for f in dernieres_factures %}
+                    <li class="list-group-item px-3 py-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold small">{{ f.numero }}</div>
+                                <div class="text-muted" style="font-size:.75rem;">{{ f.client.nom }}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="small">{{ f.montant_ttc|intcomma }}</div>
+                                <span class="badge rounded-pill
+                                    {% if f.statut == 'payee' %}bg-success
+                                    {% elif f.statut == 'partielle' %}bg-warning text-dark
+                                    {% elif f.statut == 'annulee' %}bg-secondary
+                                    {% else %}bg-primary{% endif %}"
+                                    style="font-size:.65rem;">
+                                    {{ f.get_statut_display }}
+                                </span>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted text-center small p-3">Aucune facture</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const labelsVentes = {{ labels_ventes|safe }};
+const dataVentes   = {{ data_ventes|safe }};
+const labelsCat    = {{ labels_categories|safe }};
+const dataCat      = {{ data_categories|safe }};
+
+// Graphique ventes journalières
+if (labelsVentes.length > 0) {
+    new Chart(document.getElementById('chartVentes'), {
+        type: 'bar',
+        data: {
+            labels: labelsVentes,
+            datasets: [{
+                label: 'CA (FCFA)',
+                data: dataVentes,
+                backgroundColor: 'rgba(13,110,253,0.15)',
+                borderColor: 'rgba(13,110,253,0.8)',
+                borderWidth: 2,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+} else {
+    document.getElementById('chartVentes').parentElement.innerHTML =
+        '<p class="text-muted text-center small py-4">Aucune vente sur la période</p>';
+}
+
+// Graphique répartition catégories
+const canvasCat = document.getElementById('chartCategories');
+if (canvasCat && dataCat.length > 0) {
+    const colors = ['#4361ee','#3a86ff','#06d6a0','#ffd166','#ef476f','#118ab2'];
+    new Chart(canvasCat, {
+        type: 'doughnut',
+        data: {
+            labels: labelsCat,
+            datasets: [{
+                data: dataCat,
+                backgroundColor: colors.slice(0, dataCat.length),
+                borderWidth: 2,
+                borderColor: '#fff',
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 11 } } }
+            },
+            cutout: '60%'
+        }
+    });
+}
+</script>
+{% endblock %}

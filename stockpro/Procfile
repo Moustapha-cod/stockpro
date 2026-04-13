@@ -1,0 +1,1 @@
+web: gunicorn stockpro.wsgi:application -c gunicorn.conf.py

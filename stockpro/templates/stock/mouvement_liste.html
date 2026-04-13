@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Mouvements de stock — StockPro SN{% endblock %}
+{% block page_title %}Mouvements de stock{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <form class="d-flex gap-2" method="get">
+        <select name="type" class="form-select form-select-sm" style="width:200px;">
+            <option value="">Tous les types</option>
+            {% for val, label in types %}
+            <option value="{{ val }}" {% if type_filtre == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-funnel"></i></button>
+    </form>
+    <a href="{% url 'stock:mouvement_creer' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Nouveau mouvement</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Produit</th>
+                    <th>Type</th>
+                    <th class="text-center">Qté avant</th>
+                    <th class="text-center">Quantité</th>
+                    <th class="text-center">Qté après</th>
+                    <th>Référence doc.</th>
+                    <th>Par</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in mouvements %}
+                <tr>
+                    <td class="small text-muted">{{ m.date_mouvement|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div class="fw-semibold small">{{ m.produit.nom }}</div>
+                        <div class="text-muted" style="font-size:.75rem;">{{ m.produit.reference }}</div>
+                    </td>
+                    <td>
+                        <span class="badge rounded-pill
+                            {% if m.type_mouvement == 'entree' %}bg-success
+                            {% elif m.type_mouvement == 'sortie' %}bg-danger
+                            {% elif m.type_mouvement == 'ajustement' %}bg-info text-dark
+                            {% elif m.type_mouvement == 'retour' %}bg-warning text-dark
+                            {% else %}bg-secondary{% endif %}">
+                            {{ m.get_type_mouvement_display }}
+                        </span>
+                    </td>
+                    <td class="text-center small">{{ m.quantite_avant }}</td>
+                    <td class="text-center fw-bold
+                        {% if m.type_mouvement in 'entree retour' %}text-success{% elif m.type_mouvement in 'sortie perte' %}text-danger{% endif %}">
+                        {% if m.type_mouvement == 'entree' or m.type_mouvement == 'retour' %}+{% elif m.type_mouvement == 'sortie' or m.type_mouvement == 'perte' %}-{% endif %}{{ m.quantite }}
+                    </td>
+                    <td class="text-center small">{{ m.quantite_apres }}</td>
+                    <td class="small text-muted">{{ m.reference_document|default:"—" }}</td>
+                    <td class="small">{{ m.cree_par.get_short_name|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center text-muted py-4">Aucun mouvement enregistré</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

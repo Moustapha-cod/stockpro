@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titre }} — StockPro SN{% endblock %}
+{% block page_title %}{{ titre }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+
+        {% if form.errors %}
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Veuillez corriger les erreurs ci-dessous.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-building me-2 text-primary"></i>Informations de l'entreprise
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+
+                        <!-- Nom -->
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
+                            {{ form.nom }}
+                            {% if form.nom.errors %}
+                            <div class="text-danger small mt-1">{{ form.nom.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Devise -->
+                        <div class="col-md-4">
+                            <label class="form-label">Devise</label>
+                            {{ form.devise }}
+                        </div>
+
+                        <!-- Téléphone -->
+                        <div class="col-md-6">
+                            <label class="form-label">Téléphone</label>
+                            {{ form.telephone }}
+                        </div>
+
+                        <!-- Email -->
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            {{ form.email }}
+                            {% if form.email.errors %}
+                            <div class="text-danger small mt-1">{{ form.email.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Adresse -->
+                        <div class="col-12">
+                            <label class="form-label">Adresse</label>
+                            {{ form.adresse }}
+                        </div>
+
+                        <!-- NINEA -->
+                        <div class="col-md-6">
+                            <label class="form-label">NINEA</label>
+                            {{ form.ninea }}
+                        </div>
+
+                        <!-- Registre du commerce -->
+                        <div class="col-md-6">
+                            <label class="form-label">Registre du commerce</label>
+                            {{ form.registre_commerce }}
+                        </div>
+
+                        <!-- Taux TVA -->
+                        <div class="col-md-3">
+                            <label class="form-label">Taux TVA (%)</label>
+                            {{ form.tva_taux }}
+                            {% if form.tva_taux.errors %}
+                            <div class="text-danger small mt-1">{{ form.tva_taux.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Mentions légales -->
+                        <div class="col-md-9">
+                            <label class="form-label">Mentions légales (factures)</label>
+                            {{ form.mentions_facture }}
+                        </div>
+
+                        <!-- Logo -->
+                        <div class="col-12">
+                            <label class="form-label">Logo</label>
+                            {{ form.logo }}
+                            {% if entreprise.logo %}
+                            <div class="mt-2 d-flex align-items-center gap-3">
+                                <img src="{{ entreprise.logo.url }}" alt="Logo actuel" style="max-height:60px; border-radius:4px;">
+                                <span class="text-muted small">Logo actuel</span>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                    </div><!-- /row -->
+                </div><!-- /card-body -->
+            </div><!-- /card -->
+
+            <div class="d-flex gap-2 justify-content-end">
+                <a href="{% url 'tenants:platform' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Annuler
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i>Enregistrer
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endblock %}
