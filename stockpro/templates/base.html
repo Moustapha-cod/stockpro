@@ -55,16 +55,31 @@
         }
         .page-content { padding: 1.5rem; }
         @media (max-width: 768px) {
-            .sidebar { display: none; }
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform .3s ease;
+            }
+            .sidebar.show { transform: translateX(0); }
             .main-content { margin-left: 0; }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,.5);
+                z-index: 99;
+            }
+            .sidebar-overlay.show { display: block; }
         }
     </style>
 </head>
 <body>
 
 {% if user.is_authenticated %}
+<!-- Overlay mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
 <!-- Sidebar -->
-<nav class="sidebar d-flex flex-column">
+<nav class="sidebar d-flex flex-column" id="sidebar">
     <div class="brand">
         <span class="text-white fw-bold fs-5"><i class="bi bi-box-seam me-2"></i>StockPro SN</span>
         {% if entreprise %}<div class="text-white-50 small mt-1">{{ entreprise.nom }}</div>{% endif %}
@@ -162,7 +177,12 @@
     {% if user.is_authenticated %}
     <!-- Topbar -->
     <div class="topbar d-flex align-items-center justify-content-between">
-        <h6 class="mb-0 fw-semibold text-secondary">{% block page_title %}{% endblock %}</h6>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="toggleSidebar()">
+                <i class="bi bi-list fs-5"></i>
+            </button>
+            <h6 class="mb-0 fw-semibold text-secondary">{% block page_title %}{% endblock %}</h6>
+        </div>
         <div class="d-flex align-items-center gap-3">
             <span class="text-muted small d-none d-md-inline">{{ user.email }}</span>
             <form method="post" action="{% url 'accounts:logout' %}">
@@ -201,6 +221,12 @@
         integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVzdl1"
         crossorigin="anonymous"></script>
 <script src="{% static 'js/main.js' %}"></script>
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('show');
+    document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+</script>
 
 {% if user.is_authenticated %}
 <!-- Avertissement expiration de session (8h = 28800s, alerte à 5 min de la fin) -->
