@@ -22,6 +22,17 @@
 {% endblock %}
 
 {% block content %}
+
+
+
+        
+<script type="application/json" id="labels-benefices-json">{{ labels_benefices|default:'[]'|json_script:"labels-benefices-json" }}</script>
+<script type="application/json" id="data-benefices-json">{{ data_benefices|default:'[]'|json_script:"data-benefices-json" }}</script>
+<!-- DEBUG : Affichage des variables graphiques (json_script) -->
+<script type="application/json" id="labels-ventes-json">{{ labels_ventes|default:'[]'|json_script:"labels-ventes-json" }}</script>
+<script type="application/json" id="data-ventes-json">{{ data_ventes|default:'[]'|json_script:"data-ventes-json" }}</script>
+<script type="application/json" id="labels-categories-json">{{ labels_categories|default:'[]'|json_script:"labels-categories-json" }}</script>
+<script type="application/json" id="data-categories-json">{{ data_categories|default:'[]'|json_script:"data-categories-json" }}</script>
 <!-- Sélecteur de période -->
 <div class="card shadow-sm mb-4 border-0">
     <div class="card-body py-2 px-3">
@@ -89,7 +100,7 @@
                 </div>
                 <div class="flex-grow-1">
                     <div class="text-muted small">Chiffre d'affaires</div>
-                    <div class="fw-bold fs-5">{{ ca_periode|intcomma }} FCFA</div>
+                    <div class="fw-bold fs-5">{{ ca_periode|floatformat:2|intcomma }} FCFA</div>
                     <span class="evolution-badge {% if evolution_ca >= 0 %}text-success{% else %}text-danger{% endif %}">
                         {% if evolution_ca >= 0 %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %}
                         {{ evolution_ca|floatformat:1 }}% vs période préc.
@@ -124,7 +135,7 @@
                 </div>
                 <div>
                     <div class="text-muted small">Valeur du stock</div>
-                    <div class="fw-bold fs-5">{{ valeur_stock|intcomma }} FCFA</div>
+                    <div class="fw-bold fs-5">{{ valeur_stock|floatformat:2|intcomma }} FCFA</div>
                     <span class="text-muted small">{{ nb_articles|intcomma }} articles</span>
                 </div>
             </div>
@@ -140,7 +151,7 @@
                 </div>
                 <div>
                     <div class="text-muted small">Créances impayées</div>
-                    <div class="fw-bold fs-5">{{ creances|intcomma }} FCFA</div>
+                    <div class="fw-bold fs-5">{{ creances|floatformat:2|intcomma }} FCFA</div>
                     <span class="text-muted small">{{ nb_factures_impayees }} facture{{ nb_factures_impayees|pluralize }}</span>
                 </div>
             </div>
@@ -149,32 +160,9 @@
 </div>
 
 <!-- Graphiques -->
-<div class="row g-3 mb-4">
-    <div class="col-lg-8">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white border-bottom fw-semibold">
-                <i class="bi bi-bar-chart-line text-primary me-2"></i>Ventes journalières (FCFA)
-            </div>
-            <div class="card-body">
-                <canvas id="chartVentes" height="120"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white border-bottom fw-semibold">
-                <i class="bi bi-pie-chart text-success me-2"></i>Répartition par catégorie
-            </div>
-            <div class="card-body d-flex align-items-center justify-content-center">
-                {% if data_categories != '[]' %}
-                <canvas id="chartCategories" height="200"></canvas>
-                {% else %}
-                <p class="text-muted text-center small">Aucune donnée sur la période</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+
+
+
 
 <!-- Top produits + Alertes stock + Dernières factures -->
 <div class="row g-3">
@@ -249,7 +237,7 @@
                                 <div class="text-muted" style="font-size:.75rem;">{{ f.client.nom }}</div>
                             </div>
                             <div class="text-end">
-                                <div class="small">{{ f.montant_ttc|intcomma }}</div>
+                                <div class="small">{{ f.montant_ttc|floatformat:2|intcomma }}</div>
                                 <span class="badge rounded-pill
                                     {% if f.statut == 'payee' %}bg-success
                                     {% elif f.statut == 'partielle' %}bg-warning text-dark
@@ -273,41 +261,129 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-const labelsVentes = {{ labels_ventes|safe }};
-const dataVentes   = {{ data_ventes|safe }};
-const labelsCat    = {{ labels_categories|safe }};
-const dataCat      = {{ data_categories|safe }};
+// Affichage debug des données reçues
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('debug-labels-ventes').textContent = JSON.stringify(labelsVentes);
+    document.getElementById('debug-data-ventes').textContent = JSON.stringify(dataVentes);
+});
 
-// Graphique ventes journalières
-if (labelsVentes.length > 0) {
-    new Chart(document.getElementById('chartVentes'), {
-        type: 'bar',
-        data: {
-            labels: labelsVentes,
-            datasets: [{
-                label: 'CA (FCFA)',
-                data: dataVentes,
-                backgroundColor: 'rgba(13,110,253,0.15)',
-                borderColor: 'rgba(13,110,253,0.8)',
-                borderWidth: 2,
-                borderRadius: 4,
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
-                x: { grid: { display: false } }
-            }
-        }
-    });
-} else {
-    document.getElementById('chartVentes').parentElement.innerHTML =
-        '<p class="text-muted text-center small py-4">Aucune vente sur la période</p>';
+// Initialisation des variables issues du JSON AVANT tout appel à safeChart
+
+function safeParse(id, fallback) {
+    try {
+        const el = document.getElementById(id);
+        if (!el) return fallback;
+        return JSON.parse(el.textContent);
+    } catch (e) {
+        console.warn('JSON.parse échoué pour', id, e);
+        return fallback;
+    }
 }
+
+const labelsVentes = safeParse('labels-ventes-json', []);
+const dataVentes   = safeParse('data-ventes-json', []);
+const labelsCat    = safeParse('labels-categories-json', []);
+const dataCat      = safeParse('data-categories-json', []);
+const labelsBenefices = safeParse('labels-benefices-json', []);
+const dataBenefices = safeParse('data-benefices-json', []);
+
+// Version robuste : gestion explicite des erreurs et logs
+function safeChart(id, config, emptyMsg) {
+    try {
+        const el = document.getElementById(id);
+        if (!el) {
+            console.warn('Canvas non trouvé :', id);
+            return;
+        }
+        if (config.data.labels.length === 0 || (config.data.datasets[0] && config.data.datasets[0].data.length === 0)) {
+            el.parentElement.innerHTML = `<p class="text-muted text-center small py-4">${emptyMsg}</p>`;
+            return;
+        }
+        new Chart(el, config);
+    } catch (e) {
+        console.error('Erreur Chart.js sur', id, e);
+        const el = document.getElementById(id);
+        if (el) {
+            el.parentElement.innerHTML = `<div class='text-danger small'>Erreur d\'affichage du graphique : ${e.message}</div>`;
+        }
+    }
+}
+
+safeChart('chartVentes', {
+    type: 'bar',
+    data: {
+        labels: labelsVentes,
+        datasets: [{
+            label: 'CA (FCFA)',
+            data: dataVentes,
+            backgroundColor: 'rgba(13,110,253,0.15)',
+            borderColor: 'rgba(13,110,253,0.8)',
+            borderWidth: 2,
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+            x: { grid: { display: false } }
+        }
+    }
+}, 'Aucune vente sur la période');
+
+safeChart('chartCategories', {
+    type: 'doughnut',
+    data: {
+        labels: labelsCat,
+        datasets: [{
+            data: dataCat,
+            backgroundColor: ['#4361ee','#3a86ff','#06d6a0','#ffd166','#ef476f','#118ab2'].slice(0, dataCat.length),
+            borderWidth: 2,
+            borderColor: '#fff',
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 11 } } }
+        },
+        cutout: '60%'
+    }
+}, 'Aucune donnée sur la période');
+
+safeChart('chartBenefices', {
+    type: 'line',
+    data: {
+        labels: labelsBenefices,
+        datasets: [{
+            label: 'Bénéfice réalisé (FCFA)',
+            data: dataBenefices,
+            backgroundColor: 'rgba(25,135,84,0.15)',
+            borderColor: '#198754',
+            borderWidth: 3,
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: '#198754',
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+            x: { grid: { display: false } }
+        }
+    }
+}, 'Aucun bénéfice sur la période');
+
+
 
 // Graphique répartition catégories
 const canvasCat = document.getElementById('chartCategories');
@@ -333,5 +409,6 @@ if (canvasCat && dataCat.length > 0) {
         }
     });
 }
+
 </script>
 {% endblock %}

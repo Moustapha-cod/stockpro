@@ -96,8 +96,8 @@
                         {% else %}<span class="text-muted small">—</span>{% endif %}
                     </td>
                     <td class="small">{{ p.fournisseur.nom|default:"—" }}</td>
-                    <td class="text-end small">{{ p.prix_achat|intcomma }}</td>
-                    <td class="text-end small fw-semibold">{{ p.prix_vente|intcomma }}</td>
+                    <td class="text-end small">{{ p.prix_achat|floatformat:2|intcomma }}</td>
+                    <td class="text-end small fw-semibold">{{ p.prix_vente|floatformat:2|intcomma }}</td>
                     <td class="text-center">
                         <span class="fw-bold {% if p.en_rupture %}text-danger{% elif p.en_alerte %}text-warning{% else %}text-success{% endif %}">
                             {{ p.quantite_stock }}

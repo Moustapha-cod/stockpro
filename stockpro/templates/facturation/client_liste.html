@@ -38,7 +38,7 @@
                     <td class="small">{{ c.email|default:"—" }}</td>
                     <td class="small">{{ c.ville }}</td>
                     <td class="text-end small {% if c.solde_du > 0 %}text-danger fw-semibold{% endif %}">
-                        {{ c.solde_du|intcomma }} FCFA
+                        {{ c.solde_du|floatformat:2|intcomma }} FCFA
                     </td>
                     <td class="text-center small">{{ c.nombre_factures }}</td>
                     <td class="text-end">

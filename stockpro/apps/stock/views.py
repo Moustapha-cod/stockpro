@@ -11,6 +11,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 
 from .models import Produit, ProduitPhoto, Categorie, Fournisseur, MouvementStock
 from .forms import ProduitForm, CategorieForm, FournisseurForm, MouvementStockForm
+from apps.accounts.permissions import gestionnaire_requis
 
 
 # ── Produits ──────────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ def _sauvegarder_photos(request, produit):
 
 
 @login_required
+@gestionnaire_requis
 def produit_creer(request):
     entreprise = request.entreprise
     if request.method == 'POST':
@@ -95,6 +97,7 @@ def produit_creer(request):
 
 
 @login_required
+@gestionnaire_requis
 def produit_modifier(request, pk):
     entreprise = request.entreprise
     produit = get_object_or_404(Produit, pk=pk, entreprise=entreprise)
@@ -135,6 +138,7 @@ def produit_photo_supprimer(request, pk):
 
 
 @login_required
+@gestionnaire_requis
 def produit_supprimer(request, pk):
     entreprise = request.entreprise
     produit = get_object_or_404(Produit, pk=pk, entreprise=entreprise)
@@ -237,7 +241,7 @@ def mouvement_liste(request):
     entreprise = request.entreprise
     qs = MouvementStock.objects.filter(entreprise=entreprise).select_related('produit', 'cree_par')
     type_filtre = request.GET.get('type', '')
-    if type_filtre:
+    if type_filtre and type_filtre in dict(MouvementStock.TypeMouvement.choices):
         qs = qs.filter(type_mouvement=type_filtre)
     context = {
         'mouvements': qs[:100],
@@ -248,6 +252,7 @@ def mouvement_liste(request):
 
 
 @login_required
+@gestionnaire_requis
 def mouvement_creer(request):
     entreprise = request.entreprise
     if request.method == 'POST':

@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load humanize l10n %}
+
+{% block title %}Retour produit — {{ facture.numero }}{% endblock %}
+{% block page_title %}Retour produit — {{ facture.numero }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h3>Retour de produit sur la facture {{ facture.numero }}</h3>
+    <form method="post">
+        {% csrf_token %}
+        {{ formset.management_form }}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th>Quantité à retourner</th>
+                    <th>Supprimer</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for form in formset %}
+                <tr>
+                    <td>{{ form.produit }}</td>
+                    <td>{{ form.quantite_retour }}</td>
+                    <td>{% if formset.can_delete %}{{ form.DELETE }}{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="button" class="btn btn-secondary" onclick="addFormRow()">Ajouter une ligne</button>
+        <button type="submit" class="btn btn-primary">Valider le retour</button>
+        <a href="{% url 'facturation:facture_detail' facture.pk %}" class="btn btn-secondary">Annuler</a>
+    </form>
+</div>
+<script>
+// Ajout dynamique de lignes (formset)
+function addFormRow() {
+    const totalForms = document.getElementById('id_form-TOTAL_FORMS');
+    const formIdx = parseInt(totalForms.value);
+    const table = document.querySelector('table.table-bordered tbody');
+    const emptyRow = table.querySelector('tr');
+    if (!emptyRow) return;
+    const newRow = emptyRow.cloneNode(true);
+    // Pour chaque select, on régénère les options à partir de la première ligne
+    const selects = newRow.querySelectorAll('select');
+    const firstSelect = emptyRow.querySelector('select');
+    selects.forEach(function(select) {
+        if (firstSelect) {
+            select.innerHTML = firstSelect.innerHTML;
+        }
+    });
+    newRow.querySelectorAll('input, select').forEach(function(input) {
+        input.name = input.name.replace(/-(\d+)-/, '-' + formIdx + '-');
+        input.id = input.id.replace(/-(\d+)-/, '-' + formIdx + '-');
+        if (input.type === 'number' || input.tagName === 'SELECT') input.value = '';
+        if (input.type === 'checkbox') input.checked = false;
+    });
+    table.appendChild(newRow);
+    totalForms.value = formIdx + 1;
+}
+</script>
+{% endblock %}

@@ -1,5 +1,6 @@
 """apps/facturation/forms.py — Formulaires Clients, Factures, Paiements"""
 
+from decimal import Decimal
 from django import forms
 from .models import Client, Facture, LigneFacture, Paiement
 from apps.stock.models import Produit
@@ -76,6 +77,14 @@ class LigneFactureForm(forms.ModelForm):
                 entreprise=entreprise, actif=True
             ).order_by('nom')
         self.fields['produit'].required = False
+        self.fields['designation'].required = False
+        self.fields['remise'].required = False
+
+    def clean_remise(self):
+        remise = self.cleaned_data.get('remise')
+        if remise is None:
+            return Decimal('0')
+        return remise
 
     def clean_produit(self):
         produit = self.cleaned_data.get('produit')

@@ -201,6 +201,10 @@ def utilisateur_toggle_actif(request, pk):
         profil.actif = not profil.actif
         profil.save(update_fields=['actif'])
         etat = 'activé' if profil.actif else 'désactivé'
+        logger.info(
+            f"USER_TOGGLE_ACTIF target={profil.utilisateur.email} actif={profil.actif} "
+            f"by={request.user.email} ip={request.META.get('REMOTE_ADDR')}"
+        )
         messages.success(request, f'Utilisateur {profil.utilisateur.nom_complet} {etat}.')
 
     return redirect('accounts:utilisateur_liste')
@@ -217,10 +221,18 @@ def utilisateur_changer_role(request, pk):
             return redirect('accounts:utilisateur_liste')
 
     if request.method == 'POST':
-        nouveau_role = request.POST.get('role')
+        nouveau_role = (request.POST.get('role') or '').strip()
         if nouveau_role in dict(ProfilUtilisateur.Role.choices):
+            ancien_role = profil.role
             profil.role = nouveau_role
             profil.save(update_fields=['role'])
+            logger.info(
+                f"ROLE_CHANGED target={profil.utilisateur.email} "
+                f"old={ancien_role} new={nouveau_role} "
+                f"by={request.user.email} ip={request.META.get('REMOTE_ADDR')}"
+            )
             messages.success(request, f'Rôle mis à jour : {profil.get_role_display()}.')
+        else:
+            messages.error(request, 'Rôle invalide.')
 
     return redirect('accounts:utilisateur_liste')

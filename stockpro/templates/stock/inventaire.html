@@ -42,7 +42,7 @@
                 </div>
                 <div>
                     <div class="text-muted small">Valeur achat</div>
-                    <div class="fw-bold fs-5">{{ totaux.valeur_achat|default:0|intcomma }} <small class="text-muted fw-normal" style="font-size:.7rem;">FCFA</small></div>
+                    <div class="fw-bold fs-5">{{ totaux.valeur_achat|default:0|floatformat:2|intcomma }} <small class="text-muted fw-normal" style="font-size:.7rem;">FCFA</small></div>
                 </div>
             </div>
         </div>
@@ -165,9 +165,9 @@
                         <span class="badge bg-success">Normal</span>
                         {% endif %}
                     </td>
-                    <td class="text-end small">{{ p.prix_achat|intcomma }}</td>
-                    <td class="text-end small">{{ p.prix_vente|intcomma }}</td>
-                    <td class="text-end small fw-semibold">{{ p.valeur_stock|intcomma }}</td>
+                    <td class="text-end small">{{ p.prix_achat|floatformat:2|intcomma }}</td>
+                    <td class="text-end small">{{ p.prix_vente|floatformat:2|intcomma }}</td>
+                    <td class="text-end small fw-semibold">{{ p.valeur_stock_prix_achat|floatformat:2|intcomma }}</td>
                     <td class="text-center">
                         <a href="{% url 'stock:produit_modifier' p.pk %}"
                            class="btn btn-sm btn-outline-primary py-0 px-2" title="Modifier">
@@ -194,7 +194,7 @@
                     <td colspan="5" class="small">Total ({{ nb_total }} références)</td>
                     <td class="text-center">{{ totaux.total_articles|default:0|intcomma }}</td>
                     <td colspan="4"></td>
-                    <td class="text-end small">{{ totaux.valeur_achat|default:0|intcomma }} FCFA</td>
+                    <td class="text-end small">{{ totaux.valeur_achat|default:0|floatformat:2|intcomma }} FCFA</td>
                     <td></td>
                 </tr>
             </tfoot>

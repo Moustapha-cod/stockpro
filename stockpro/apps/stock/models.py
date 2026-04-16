@@ -168,21 +168,47 @@ class Produit(TenantMixin):
     # ── Propriétés calculées ──────────────────────────────────────────────────
 
     @property
+    def cout_moyen_pondere(self):
+        """Coût Unitaire Moyen Pondéré (CUMP) calculé depuis les mouvements d'entrée."""
+        from django.db.models import Sum, F
+        entrees = self.mouvements.filter(
+            type_mouvement__in=['entree', 'retour'],
+            prix_unitaire__isnull=False,
+            prix_unitaire__gt=0,
+        ).aggregate(
+            total_valeur=Sum(F('prix_unitaire') * F('quantite')),
+            total_quantite=Sum('quantite'),
+        )
+        total_valeur = entrees['total_valeur'] or Decimal('0')
+        total_quantite = entrees['total_quantite'] or 0
+        if total_quantite > 0:
+            return total_valeur / total_quantite
+        return self.prix_achat  # Fallback sur le prix de la fiche produit
+
+    @property
     def marge(self):
-        """Marge brute en FCFA"""
-        return self.prix_vente - self.prix_achat
+        """Marge brute en FCFA (prix de vente - coût moyen pondéré)"""
+        return self.prix_vente - self.cout_moyen_pondere
 
     @property
     def taux_marge(self):
         """Taux de marge en pourcentage"""
-        if self.prix_achat > 0:
-            return ((self.prix_vente - self.prix_achat) / self.prix_achat) * 100
+        cump = self.cout_moyen_pondere
+        if cump > 0:
+            return ((self.prix_vente - cump) / cump) * 100
         return Decimal('0')
 
     @property
     def valeur_stock(self):
-        """Valeur totale du stock au prix d'achat"""
-        return self.quantite_stock * self.prix_achat
+        """Valeur totale du stock au coût moyen pondéré (CUMP)"""
+        return self.quantite_stock * self.cout_moyen_pondere
+
+    @property
+    def valeur_stock_prix_achat(self):
+        """Valeur du stock selon le prix d'achat de la fiche produit."""
+        from decimal import Decimal
+        prix = self.prix_achat if self.prix_achat is not None else Decimal('0')
+        return self.quantite_stock * prix
 
     @property
     def en_alerte(self):
@@ -238,7 +264,8 @@ class MouvementStock(TenantMixin):
         ENTREE = 'entree', _('Entrée')
         SORTIE = 'sortie', _('Sortie')
         AJUSTEMENT = 'ajustement', _('Ajustement inventaire')
-        RETOUR = 'retour', _('Retour fournisseur')
+        RETOUR_FOURNISSEUR = 'retour_fournisseur', _('Retour fournisseur')
+        RETOUR_CLIENT = 'retour_client', _('Retour client')
         PERTE = 'perte', _('Perte / casse')
 
     produit = models.ForeignKey(
@@ -315,7 +342,8 @@ class MouvementStock(TenantMixin):
 
                 if self.type_mouvement in (
                     self.TypeMouvement.ENTREE,
-                    self.TypeMouvement.RETOUR
+                    self.TypeMouvement.RETOUR_FOURNISSEUR,
+                    self.TypeMouvement.RETOUR_CLIENT
                 ):
                     produit.quantite_stock += self.quantite
                 elif self.type_mouvement in (
@@ -324,7 +352,7 @@ class MouvementStock(TenantMixin):
                 ):
                     produit.quantite_stock = max(0, produit.quantite_stock - self.quantite)
                 elif self.type_mouvement == self.TypeMouvement.AJUSTEMENT:
-                    produit.quantite_stock = self.quantite  # La quantité = la nouvelle valeur
+                    produit.quantite_stock = self.quantite
 
                 self.quantite_apres = produit.quantite_stock
                 produit.save(update_fields=['quantite_stock', 'date_modification'])

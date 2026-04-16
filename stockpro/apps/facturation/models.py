@@ -183,13 +183,15 @@ class Facture(TenantMixin):
 
     @property
     def montant_restant(self):
-        return self.montant_ttc - self.montant_paye
+        # Toujours >= 0
+        return max(self.montant_ttc - self.montant_paye, 0)
 
     @property
     def taux_paiement(self):
-        """Pourcentage payé"""
+        """Pourcentage payé (0 à 100)"""
         if self.montant_ttc > 0:
-            return int((self.montant_paye / self.montant_ttc) * 100)
+            taux = (self.montant_paye / self.montant_ttc) * 100
+            return max(0, min(int(taux), 100))
         return 0
 
     @property
@@ -204,7 +206,8 @@ class Facture(TenantMixin):
     def recalculer_totaux(self):
         """Recalcule les montants HT, TVA et TTC depuis les lignes."""
         ht = sum(ligne.montant_ht for ligne in self.lignes.all())
-        remise = ht * (self.remise_globale / 100)
+        from decimal import Decimal
+        remise = ht * (self.remise_globale / Decimal('100'))
         ht_net = ht - remise
         tva = ht_net * (self.taux_tva / 100)
         ttc = ht_net + tva
@@ -228,21 +231,23 @@ class Facture(TenantMixin):
             self.save(update_fields=['statut', 'date_modification'])
 
     def generer_numero(self):
-        """Génère le prochain numéro de facture (FAC-YYYY-XXXX)."""
+        """Génère le prochain numéro de facture (FAC-YYYY-XXXX) de façon atomique."""
         from django.utils import timezone
+        from django.db import transaction
         annee = timezone.now().year
-        derniere = Facture.objects.filter(
-            entreprise=self.entreprise,
-            numero__startswith=f'FAC-{annee}-'
-        ).order_by('-id').first()
+        with transaction.atomic():
+            derniere = Facture.objects.select_for_update().filter(
+                entreprise=self.entreprise,
+                numero__startswith=f'FAC-{annee}-'
+            ).order_by('-id').first()
 
-        if derniere:
-            try:
-                seq = int(derniere.numero.split('-')[-1]) + 1
-            except (ValueError, IndexError):
+            if derniere:
+                try:
+                    seq = int(derniere.numero.split('-')[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
                 seq = 1
-        else:
-            seq = 1
 
         return f'FAC-{annee}-{seq:04d}'
 
@@ -358,11 +363,12 @@ class Paiement(TenantMixin):
         return f'Paiement {self.montant} FCFA — {self.facture.numero}'
 
     def _sync_facture(self):
-        """Recalcule et sauvegarde montant_paye + statut de la facture."""
+        """Recalcule et sauvegarde montant_paye + statut de la facture (jamais négatif)."""
         total_paye = self.facture.paiements.aggregate(
             total=models.Sum('montant')
         )['total'] or Decimal('0')
-        self.facture.montant_paye = total_paye
+        # Ne jamais descendre en dessous de zéro
+        self.facture.montant_paye = max(total_paye, Decimal('0'))
         self.facture.save(update_fields=['montant_paye', 'date_modification'])
         self.facture.mettre_a_jour_statut()
 

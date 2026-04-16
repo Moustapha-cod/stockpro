@@ -46,9 +46,9 @@
                         {{ f.date_echeance|date:"d/m/Y"|default:"—" }}
                         {% if f.est_en_retard %}<i class="bi bi-exclamation-circle ms-1"></i>{% endif %}
                     </td>
-                    <td class="text-end small fw-semibold">{{ f.montant_ttc|intcomma }}</td>
-                    <td class="text-end small text-success">{{ f.montant_paye|intcomma }}</td>
-                    <td class="text-end small {% if f.montant_restant > 0 %}text-danger{% endif %}">{{ f.montant_restant|intcomma }}</td>
+                    <td class="text-end small fw-semibold">{{ f.montant_ttc|floatformat:2|intcomma }}</td>
+                    <td class="text-end small text-success">{{ f.montant_paye|floatformat:2|intcomma }}</td>
+                    <td class="text-end small {% if f.montant_restant > 0 %}text-danger{% endif %}">{{ f.montant_restant|floatformat:2|intcomma }}</td>
                     <td class="text-center">
                         <span class="badge
                             {% if f.statut == 'payee' %}bg-success

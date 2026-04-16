@@ -142,3 +142,10 @@ class MonProfilForm(forms.ModelForm):
             'last_name':  'Nom',
             'email':      'Adresse email',
         }
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email and email != self.instance.email:
+            if User.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
+                raise forms.ValidationError('Cette adresse email est déjà utilisée.')
+        return email

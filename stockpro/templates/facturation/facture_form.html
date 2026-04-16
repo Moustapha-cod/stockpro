@@ -32,6 +32,22 @@
 <form method="post" id="facture-form">
 {% csrf_token %}
 
+<!-- ── Erreurs globales ───────────────────────────────────────────────── -->
+{% if form.non_field_errors %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    {% for error in form.non_field_errors %}{{ error }}<br>{% endfor %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if formset.non_form_errors %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    {% for error in formset.non_form_errors %}{{ error }}<br>{% endfor %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <!-- ── Ligne 1 : Informations ─────────────────────────────────────────── -->
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold">
@@ -98,11 +114,21 @@
                 <tbody id="lignes-body">
                     {% for ligne_form in formset %}
                     <tr class="formset-row {% if ligne_form.instance.pk %}existing-row{% endif %}" data-index="{{ forloop.counter0 }}">
-                        <td class="col-produit">{{ ligne_form.produit }}{{ ligne_form.id }}</td>
-                        <td class="col-design">{{ ligne_form.designation }}</td>
-                        <td class="col-qte">{{ ligne_form.quantite }}</td>
-                        <td class="col-prix">{{ ligne_form.prix_unitaire_ht }}</td>
-                        <td class="col-remise">{{ ligne_form.remise }}</td>
+                        <td class="col-produit">{{ ligne_form.produit }}{{ ligne_form.id }}
+                            {% if ligne_form.produit.errors %}<div class="text-danger small">{{ ligne_form.produit.errors }}</div>{% endif %}
+                        </td>
+                        <td class="col-design">{{ ligne_form.designation }}
+                            {% if ligne_form.designation.errors %}<div class="text-danger small">{{ ligne_form.designation.errors }}</div>{% endif %}
+                        </td>
+                        <td class="col-qte">{{ ligne_form.quantite }}
+                            {% if ligne_form.quantite.errors %}<div class="text-danger small">{{ ligne_form.quantite.errors }}</div>{% endif %}
+                        </td>
+                        <td class="col-prix">{{ ligne_form.prix_unitaire_ht }}
+                            {% if ligne_form.prix_unitaire_ht.errors %}<div class="text-danger small">{{ ligne_form.prix_unitaire_ht.errors }}</div>{% endif %}
+                        </td>
+                        <td class="col-remise">{{ ligne_form.remise }}
+                            {% if ligne_form.remise.errors %}<div class="text-danger small">{{ ligne_form.remise.errors }}</div>{% endif %}
+                        </td>
                         <td class="col-total"><span class="ligne-total">—</span></td>
                         <td class="col-action text-center">
                             {% if ligne_form.instance.pk %}
@@ -156,155 +182,180 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ produits_data|json_script:"produits-data" }}
 <script>
-// ── Formatage ──────────────────────────────────────────────────────────
-function fmt(n) {
-    return n > 0 ? Math.round(n).toLocaleString('fr-FR') + ' FCFA' : '—';
-}
+(function() {
+    'use strict';
 
-// ── Recalcul totaux ────────────────────────────────────────────────────
-function recalculer() {
-    let totalHT = 0;
-    document.querySelectorAll('.formset-row').forEach(function(row) {
-        if (row.dataset.deleted === '1') return;
-        const qte    = parseFloat(row.querySelector('.ligne-qte')?.value)       || 0;
-        const pu     = parseFloat(row.querySelector('.ligne-prix')?.value)       || 0;
-        const remise = parseFloat(row.querySelector('[id$="-remise"]')?.value)   || 0;
-        const ht     = qte * pu * (1 - remise / 100);
-        totalHT += ht;
-        const span = row.querySelector('.ligne-total');
-        if (span) span.textContent = fmt(ht);
-    });
+    // ── Données produits pour auto-remplissage ─────────────────────────
+    var produitsEl = document.getElementById('produits-data');
+    var PRODUITS = produitsEl ? JSON.parse(produitsEl.textContent) : {};
+    console.log('[StockPro] Produits chargés:', Object.keys(PRODUITS).length);
 
-    const remiseGlob = parseFloat(document.querySelector('[name$="remise_globale"]')?.value) || 0;
-    totalHT = totalHT * (1 - remiseGlob / 100);
+    // ── Formatage ──────────────────────────────────────────────────────
+    function fmt(n) {
+        return n > 0 ? Math.round(n).toLocaleString('fr-FR') + ' FCFA' : '—';
+    }
 
-    const tva        = parseFloat(document.querySelector('[name$="taux_tva"]')?.value) || 18;
-    const montantTVA = totalHT * tva / 100;
-    const ttc        = totalHT + montantTVA;
+    // ── Recalcul totaux ────────────────────────────────────────────────
+    function recalculer() {
+        var totalHT = 0;
+        document.querySelectorAll('.formset-row').forEach(function(row) {
+            if (row.dataset.deleted === '1') return;
+            var qte    = parseFloat(row.querySelector('.ligne-qte')?.value)       || 0;
+            var pu     = parseFloat(row.querySelector('.ligne-prix')?.value)       || 0;
+            var remise = parseFloat(row.querySelector('[id$="-remise"]')?.value)   || 0;
+            var ht     = qte * pu * (1 - remise / 100);
+            totalHT += ht;
+            var span = row.querySelector('.ligne-total');
+            if (span) span.textContent = fmt(ht);
+        });
 
-    document.getElementById('total-ht').textContent  = fmt(totalHT);
-    document.getElementById('total-tva').textContent = fmt(montantTVA);
-    document.getElementById('total-ttc').textContent = fmt(ttc);
-}
+        var remiseGlob = parseFloat(document.querySelector('[name$="remise_globale"]')?.value) || 0;
+        totalHT = totalHT * (1 - remiseGlob / 100);
 
-// ── Suppression d'une ligne ────────────────────────────────────────────
-function supprimerLigne(btn) {
-    const row = btn.closest('tr');
-    const cb  = row.querySelector('input[type=checkbox][id$="-DELETE"]');
+        var tva        = parseFloat(document.querySelector('[name$="taux_tva"]')?.value) || 18;
+        var montantTVA = totalHT * tva / 100;
+        var ttc        = totalHT + montantTVA;
 
-    if (cb) {
-        // Ligne existante en base → cocher DELETE et masquer visuellement
-        cb.checked = true;
-        row.dataset.deleted = '1';
-        row.style.opacity = '0.35';
-        row.style.textDecoration = 'line-through';
+        document.getElementById('total-ht').textContent  = fmt(totalHT);
+        document.getElementById('total-tva').textContent = fmt(montantTVA);
+        document.getElementById('total-ttc').textContent = fmt(ttc);
+    }
+
+    // ── Auto-remplissage par EVENT DELEGATION sur le tbody ─────────────
+    var lignesBody = document.getElementById('lignes-body');
+    if (lignesBody) {
+        lignesBody.addEventListener('change', function(e) {
+            var sel = e.target;
+            if (!sel.classList.contains('ligne-produit')) return;
+
+            var info = PRODUITS[sel.value];
+            console.log('[StockPro] Produit sélectionné:', sel.value, info);
+            if (!info) return;
+
+            var row   = sel.closest('tr');
+            var desig = row.querySelector('[id$="-designation"]');
+            var prix  = row.querySelector('.ligne-prix');
+
+            if (desig) desig.value = info.nom;
+            if (prix)  prix.value  = info.prix;
+            recalculer();
+        });
+
+        // Recalcul sur input/change de tout champ dans le tbody
+        lignesBody.addEventListener('input', recalculer);
+    }
+
+    // Recalcul quand on change remise globale ou taux TVA
+    document.querySelector('[name$="remise_globale"]')?.addEventListener('input', recalculer);
+    document.querySelector('[name$="taux_tva"]')?.addEventListener('input', recalculer);
+
+    // ── Suppression d'une ligne ────────────────────────────────────────
+    function supprimerLigne(btn) {
+        var row = btn.closest('tr');
+        var cb  = row.querySelector('input[type=checkbox][id$="-DELETE"]');
+
+        if (cb) {
+            cb.checked = true;
+            row.dataset.deleted = '1';
+            row.style.opacity = '0.35';
+            row.style.textDecoration = 'line-through';
+            row.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), select').forEach(function(el) {
+                el.disabled = true;
+            });
+            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+            btn.title = 'Annuler';
+            btn.classList.replace('btn-outline-danger', 'btn-outline-secondary');
+            btn.onclick = function() { restaurerLigne(btn); };
+        } else {
+            row.remove();
+            totalForms--;
+            document.getElementById('id_lignes-TOTAL_FORMS').value = totalForms;
+        }
+        recalculer();
+    }
+
+    function restaurerLigne(btn) {
+        var row = btn.closest('tr');
+        var cb  = row.querySelector('input[type=checkbox][id$="-DELETE"]');
+        cb.checked = false;
+        row.dataset.deleted = '0';
+        row.style.opacity = '';
+        row.style.textDecoration = '';
         row.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), select').forEach(function(el) {
-            el.disabled = true;
+            el.disabled = false;
         });
-        // Transformer le bouton en "annuler"
-        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
-        btn.title = 'Annuler';
-        btn.classList.replace('btn-outline-danger', 'btn-outline-secondary');
-        btn.onclick = function() { restaurerLigne(btn); };
-    } else {
-        // Nouvelle ligne (pas en base) → retirer du DOM
-        row.remove();
-        totalForms--;
+        btn.innerHTML = '<i class="bi bi-trash"></i>';
+        btn.title = 'Supprimer cette ligne';
+        btn.classList.replace('btn-outline-secondary', 'btn-outline-danger');
+        btn.onclick = function() { supprimerLigne(btn); };
+        recalculer();
+    }
+
+    // ── Boutons suppression par EVENT DELEGATION ──────────────────────
+    if (lignesBody) {
+        lignesBody.addEventListener('click', function(e) {
+            var btn = e.target.closest('.btn-delete-ligne');
+            if (!btn) return;
+            e.preventDefault();
+            supprimerLigne(btn);
+        });
+    }
+
+    // ── Ajout dynamique de lignes ─────────────────────────────────────
+    var totalForms = parseInt(document.getElementById('id_lignes-TOTAL_FORMS')?.value || 0);
+
+    document.getElementById('btn-add-ligne')?.addEventListener('click', function() {
+        var tbody    = document.getElementById('lignes-body');
+        var template = tbody.querySelector('.formset-row');
+        if (!template) return;
+
+        var newRow = template.cloneNode(true);
+        newRow.classList.remove('existing-row');
+        newRow.dataset.deleted = '0';
+        newRow.style.opacity = '';
+        newRow.style.textDecoration = '';
+
+        // Mettre à jour les index Django
+        newRow.querySelectorAll('[name],[id]').forEach(function(el) {
+            ['name', 'id', 'for'].forEach(function(attr) {
+                var val = el.getAttribute(attr);
+                if (val) el.setAttribute(attr, val.replace(/-\d+-/, '-' + totalForms + '-'));
+            });
+        });
+
+        // Vider les valeurs
+        newRow.querySelectorAll('input:not([type=hidden])').forEach(function(el) {
+            el.value = '';
+            el.disabled = false;
+        });
+        newRow.querySelectorAll('select').forEach(function(el) {
+            el.selectedIndex = 0;
+            el.disabled = false;
+        });
+        var totalSpan = newRow.querySelector('.ligne-total');
+        if (totalSpan) totalSpan.textContent = '—';
+
+        // Supprimer la checkbox DELETE cachée (pas encore en base)
+        var hiddenDelete = newRow.querySelector('input[type=checkbox][id$="-DELETE"]');
+        if (hiddenDelete) hiddenDelete.closest('div')?.remove();
+
+        // Rebinder le bouton delete style
+        var delBtn = newRow.querySelector('.btn-delete-ligne');
+        if (delBtn) {
+            delBtn.innerHTML = '<i class="bi bi-trash"></i>';
+            delBtn.title = 'Supprimer cette ligne';
+            delBtn.classList.remove('btn-outline-secondary');
+            delBtn.classList.add('btn-outline-danger');
+        }
+
+        tbody.appendChild(newRow);
+        totalForms++;
         document.getElementById('id_lignes-TOTAL_FORMS').value = totalForms;
-    }
+    });
+
     recalculer();
-}
-
-function restaurerLigne(btn) {
-    const row = btn.closest('tr');
-    const cb  = row.querySelector('input[type=checkbox][id$="-DELETE"]');
-    cb.checked = false;
-    row.dataset.deleted = '0';
-    row.style.opacity = '';
-    row.style.textDecoration = '';
-    row.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), select').forEach(function(el) {
-        el.disabled = false;
-    });
-    btn.innerHTML = '<i class="bi bi-trash"></i>';
-    btn.title = 'Supprimer cette ligne';
-    btn.classList.replace('btn-outline-secondary', 'btn-outline-danger');
-    btn.onclick = function() { supprimerLigne(btn); };
-    recalculer();
-}
-
-// ── Attacher les boutons de suppression ───────────────────────────────
-function attachDeleteBtn(btn) {
-    btn.onclick = function() { supprimerLigne(btn); };
-}
-
-document.querySelectorAll('.btn-delete-ligne').forEach(attachDeleteBtn);
-
-// ── Listeners recalcul ────────────────────────────────────────────────
-function attachListeners(row) {
-    row.querySelectorAll('input, select').forEach(function(el) {
-        el.addEventListener('input', recalculer);
-        el.addEventListener('change', recalculer);
-    });
-}
-document.querySelectorAll('.formset-row').forEach(attachListeners);
-document.querySelector('[name$="remise_globale"]')?.addEventListener('input', recalculer);
-document.querySelector('[name$="taux_tva"]')?.addEventListener('input', recalculer);
-
-// ── Ajout dynamique de lignes ─────────────────────────────────────────
-let totalForms = parseInt(document.getElementById('id_lignes-TOTAL_FORMS')?.value || 0);
-
-document.getElementById('btn-add-ligne')?.addEventListener('click', function() {
-    const tbody    = document.getElementById('lignes-body');
-    const template = tbody.querySelector('.formset-row');
-    if (!template) return;
-
-    const newRow = template.cloneNode(true);
-    newRow.classList.remove('existing-row');
-    newRow.dataset.deleted = '0';
-    newRow.style.opacity = '';
-    newRow.style.textDecoration = '';
-
-    // Mettre à jour les index Django
-    newRow.querySelectorAll('[name],[id]').forEach(function(el) {
-        ['name', 'id', 'for'].forEach(function(attr) {
-            const val = el.getAttribute(attr);
-            if (val) el.setAttribute(attr, val.replace(/-\d+-/, '-' + totalForms + '-'));
-        });
-    });
-
-    // Vider les valeurs
-    newRow.querySelectorAll('input:not([type=hidden])').forEach(function(el) {
-        el.value = '';
-        el.disabled = false;
-    });
-    newRow.querySelectorAll('select').forEach(function(el) {
-        el.selectedIndex = 0;
-        el.disabled = false;
-    });
-    const totalSpan = newRow.querySelector('.ligne-total');
-    if (totalSpan) totalSpan.textContent = '—';
-
-    // Supprimer la checkbox DELETE cachée (pas encore en base)
-    const hiddenDelete = newRow.querySelector('input[type=checkbox][id$="-DELETE"]');
-    if (hiddenDelete) hiddenDelete.closest('div')?.remove();
-
-    // Rebinder le bouton delete
-    const delBtn = newRow.querySelector('.btn-delete-ligne');
-    if (delBtn) {
-        delBtn.innerHTML = '<i class="bi bi-trash"></i>';
-        delBtn.title = 'Supprimer cette ligne';
-        delBtn.classList.remove('btn-outline-secondary');
-        delBtn.classList.add('btn-outline-danger');
-        attachDeleteBtn(delBtn);
-    }
-
-    tbody.appendChild(newRow);
-    totalForms++;
-    document.getElementById('id_lignes-TOTAL_FORMS').value = totalForms;
-    attachListeners(newRow);
-});
-
-recalculer();
+})();
 </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load humanize l10n %}
 
 {% block title %}{{ facture.numero }} — StockPro SN{% endblock %}
 {% block page_title %}{{ facture.numero }}{% endblock %}
@@ -66,6 +66,7 @@
                             {% if facture.statut != 'annulee' %}
                             <a href="{% url 'facturation:facture_modifier' facture.pk %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
                             <a href="{% url 'facturation:facture_annuler' facture.pk %}" class="btn btn-sm btn-outline-danger" title="Annuler"><i class="bi bi-x-circle"></i></a>
+                            <a href="{% url 'facturation:facture_retour_produit' facture.pk %}" class="btn btn-sm btn-outline-warning" title="Retour produit"><i class="bi bi-arrow-counterclockwise"></i> Retour produit</a>
                             {% endif %}
                         </div>
                     </div>
@@ -95,10 +96,10 @@
                         <tr>
                             <td class="fw-semibold small">{{ ligne.designation }}</td>
                             <td class="small text-muted">{{ ligne.reference|default:"—" }}</td>
-                            <td class="text-center small">{{ ligne.quantite }}</td>
-                            <td class="text-end small">{{ ligne.prix_unitaire_ht|intcomma }}</td>
+                            <td class="text-center small">{{ ligne.quantite_restante|default:ligne.quantite }}</td>
+                            <td class="text-end small">{{ ligne.prix_unitaire_ht|floatformat:2|intcomma }}</td>
                             <td class="text-center small">{% if ligne.remise %}{{ ligne.remise }}%{% else %}—{% endif %}</td>
-                            <td class="text-end small fw-semibold">{{ ligne.montant_ht|floatformat:0|intcomma }}</td>
+                            <td class="text-end small fw-semibold">{{ ligne.montant_ht|floatformat:2|intcomma }}</td>
                         </tr>
                         {% empty %}
                         <tr><td colspan="6" class="text-center text-muted py-3">Aucune ligne</td></tr>
@@ -110,22 +111,23 @@
                 <div class="row justify-content-end">
                     <div class="col-md-5">
                         <table class="table table-sm mb-0">
-                            <tr><td class="text-muted small">Sous-total HT</td><td class="text-end small">{{ facture.montant_ht|intcomma }} FCFA</td></tr>
+                            <tr><td class="text-muted small">Sous-total HT</td><td class="text-end small">{{ facture.montant_ht|floatformat:2|intcomma }} FCFA</td></tr>
                             {% if facture.remise_globale %}<tr><td class="text-muted small">Remise ({{ facture.remise_globale }}%)</td><td class="text-end small text-danger">incluse</td></tr>{% endif %}
-                            <tr><td class="text-muted small">TVA ({{ facture.taux_tva }}%)</td><td class="text-end small">{{ facture.montant_tva|intcomma }} FCFA</td></tr>
-                            <tr class="fw-bold border-top"><td>Total TTC</td><td class="text-end text-primary fs-6">{{ facture.montant_ttc|intcomma }} FCFA</td></tr>
+                            <tr><td class="text-muted small">TVA ({{ facture.taux_tva }}%)</td><td class="text-end small">{{ facture.montant_tva|floatformat:2|intcomma }} FCFA</td></tr>
+                            <tr class="fw-bold border-top"><td>Total TTC</td><td class="text-end text-primary fs-6">{{ facture.montant_ttc|floatformat:2|intcomma }} FCFA</td></tr>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
 
+
         <!-- Historique des paiements -->
-        <div class="card shadow-sm">
+        <div class="card shadow-sm mb-3">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <span class="fw-semibold small"><i class="bi bi-clock-history me-2 text-success"></i>Historique des paiements</span>
                 <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
-                    {{ facture.montant_paye|intcomma }} / {{ facture.montant_ttc|intcomma }} FCFA
+                    {{ facture.montant_paye|floatformat:2|intcomma }} / {{ facture.montant_ttc|floatformat:2|intcomma }} FCFA
                 </span>
             </div>
             <div class="card-body {% if not paiements %}py-3{% endif %}">
@@ -136,7 +138,7 @@
                         <div class="timeline-dot {% if p.mode_paiement == 'credit' %}credit{% endif %}"></div>
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <div class="fw-semibold small">{{ p.montant|intcomma }} FCFA</div>
+                                <div class="fw-semibold small">{{ p.montant|floatformat:2|intcomma }} FCFA</div>
                                 <div class="text-muted" style="font-size:.78rem;">
                                     {{ p.get_mode_paiement_display }} · {{ p.date_paiement|date:"d/m/Y" }}
                                     {% if p.reference_paiement %} · <span class="text-info">{{ p.reference_paiement }}</span>{% endif %}
@@ -146,7 +148,7 @@
                             </div>
                             {% if facture.statut != 'annulee' %}
                             <form method="post" action="{% url 'facturation:paiement_supprimer' p.pk %}"
-                                  onsubmit="return confirm('Supprimer ce paiement de {{ p.montant|intcomma }} FCFA ?')">
+                                  onsubmit="return confirm('Supprimer ce paiement de {{ p.montant|floatformat:2|intcomma }} FCFA ?')">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Supprimer">
                                     <i class="bi bi-trash" style="font-size:.75rem;"></i>
@@ -165,6 +167,38 @@
             </div>
         </div>
 
+        <!-- Historique des retours produits -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold small">
+                <i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Historique des retours produits
+            </div>
+            <div class="card-body {% if not retours %}py-3{% endif %}">
+                {% if retours %}
+                <div class="timeline-paiement">
+                    {% for r in retours %}
+                    <div class="timeline-item">
+                        <div class="timeline-dot" style="background:#ffc107;box-shadow:0 0 0 2px #ffc107;"></div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold small">{{ r.produit.nom }} × {{ r.quantite }} — {{ r.prix_unitaire|floatformat:2|intcomma }} FCFA</div>
+                                <div class="text-muted" style="font-size:.78rem;">
+                                    {{ r.date_mouvement|date:"d/m/Y H:i" }}
+                                    {% if r.motif %} · <span class="text-info">{{ r.motif }}</span>{% endif %}
+                                    {% if r.cree_par %} · par {{ r.cree_par.nom_complet }}{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center small mb-0 py-2">
+                    <i class="bi bi-dash-circle me-1"></i>Aucun retour produit enregistré
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
     </div>
 
     <!-- ══ Colonne latérale ════════════════════════════════════════════════ -->
@@ -175,17 +209,17 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between mb-1">
                     <span class="text-muted small">Total TTC</span>
-                    <span class="fw-bold">{{ facture.montant_ttc|intcomma }} FCFA</span>
+                    <span class="fw-bold">{{ facture.montant_ttc|floatformat:2|intcomma }} FCFA</span>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
                     <span class="text-muted small">Déjà payé</span>
-                    <span class="text-success fw-semibold">{{ facture.montant_paye|intcomma }} FCFA</span>
+                    <span class="text-success fw-semibold">{{ facture.montant_paye|floatformat:2|intcomma }} FCFA</span>
                 </div>
                 <hr class="my-2">
                 <div class="d-flex justify-content-between">
                     <span class="fw-bold">Reste dû</span>
                     <span class="fw-bold fs-6 {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
-                        {{ facture.montant_restant|intcomma }} FCFA
+                        {{ facture.montant_restant|floatformat:2|intcomma }} FCFA
                     </span>
                 </div>
                 {% if facture.montant_ttc > 0 %}
@@ -229,11 +263,11 @@
                     <div class="small text-muted fw-semibold mb-1">Montant rapide</div>
                     <div class="d-flex gap-1 flex-wrap">
                         <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
-                                onclick="setMontant({{ facture.montant_restant|floatformat:0 }} * 0.25)">25%</button>
+                                onclick="setMontant({% localize off %}{{ facture.montant_restant }}{% endlocalize %} * 0.25)">25%</button>
                         <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
-                                onclick="setMontant({{ facture.montant_restant|floatformat:0 }} * 0.50)">50%</button>
+                                onclick="setMontant({% localize off %}{{ facture.montant_restant }}{% endlocalize %} * 0.50)">50%</button>
                         <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
-                                onclick="setMontant({{ facture.montant_restant|floatformat:0 }} * 0.75)">75%</button>
+                                onclick="setMontant({% localize off %}{{ facture.montant_restant }}{% endlocalize %} * 0.75)">75%</button>
                     </div>
                 </div>
 
@@ -251,7 +285,7 @@
                         </div>
                         <button type="submit" name="payer_integral" value="1"
                                 class="btn btn-success btn-sm w-100">
-                            <i class="bi bi-check-circle me-1"></i>Solder — {{ facture.montant_restant|intcomma }} FCFA
+                            <i class="bi bi-check-circle me-1"></i>Solder — {{ facture.montant_restant|floatformat:2|intcomma }} FCFA
                         </button>
                     </form>
                 </div>
@@ -264,9 +298,9 @@
                             <label class="form-label small fw-semibold">Montant (FCFA) *</label>
                             <input type="number" name="montant" id="montant-input"
                                    class="form-control form-control-sm"
-                                   value="{{ facture.montant_restant|floatformat:0 }}"
-                                   min="1" max="{{ facture.montant_restant|floatformat:0 }}" required>
-                            <div class="text-muted small mt-1">Restant : {{ facture.montant_restant|intcomma }} FCFA</div>
+                                   value="{% localize off %}{{ facture.montant_restant }}{% endlocalize %}"
+                                   min="1" max="{% localize off %}{{ facture.montant_restant }}{% endlocalize %}" required>
+                            <div class="text-muted small mt-1">Restant : {{ facture.montant_restant|floatformat:2|intcomma }} FCFA</div>
                         </div>
                         <div class="mb-2">
                             <label class="form-label small fw-semibold">Mode de paiement</label>
@@ -311,7 +345,7 @@
             <div class="card-body py-2 px-3">
                 <div class="small text-muted">Solde dû par {{ facture.client.nom }}</div>
                 <div class="fw-bold {% if facture.client.solde_du > 0 %}text-danger{% else %}text-success{% endif %}">
-                    {{ facture.client.solde_du|intcomma }} FCFA
+                    {{ facture.client.solde_du|floatformat:2|intcomma }} FCFA
                 </div>
                 <div class="small text-muted">sur {{ facture.client.nombre_factures }} facture{{ facture.client.nombre_factures|pluralize }}</div>
             </div>
@@ -323,7 +357,7 @@
 
 {% block extra_js %}
 <script>
-const montantRestant = {{ facture.montant_restant|floatformat:0 }};
+const montantRestant = {% localize off %}{{ facture.montant_restant }}{% endlocalize %};
 
 function setType(type, btn) {
     // Reset boutons

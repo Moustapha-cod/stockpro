@@ -157,11 +157,15 @@ LOGIN_REDIRECT_URL = 'dashboard:index'
 LOGOUT_REDIRECT_URL = 'accounts:login'
 
 # ─── Internationalisation ─────────────────────────────────────────────────────
-LANGUAGE_CODE = 'fr-sn'
+LANGUAGE_CODE = 'fr-fr'
 TIME_ZONE = 'Africa/Dakar'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
+USE_THOUSAND_SEPARATOR = True
+THOUSAND_SEPARATOR = ' '
+DECIMAL_SEPARATOR = ','
+NUMBER_GROUPING = 3
 
 LANGUAGES = [
     ('fr', 'Français'),

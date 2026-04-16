@@ -23,4 +23,5 @@ urlpatterns = [
     path('factures/<int:pk>/modifier/', views.facture_modifier, name='facture_modifier'),
     path('factures/<int:pk>/annuler/', views.facture_annuler, name='facture_annuler'),
     path('factures/<int:pk>/imprimer/', views.facture_imprimer, name='facture_imprimer'),
+    path('factures/<int:pk>/retour/', views.facture_retour_produit, name='facture_retour_produit'),
 ]

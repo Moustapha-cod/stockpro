@@ -27,16 +27,158 @@ from apps.stock.models import Produit, MouvementStock, Categorie
 from apps.facturation.models import Facture, LigneFacture, Paiement
 
 
+
 @login_required
 def index(request):
+    # ── Période sélectionnée ──────────────────────────────────────────────────
+    periode    = request.GET.get('periode', '30')
+    date_debut = request.GET.get('date_debut', '')
+    date_fin   = request.GET.get('date_fin', '')
+
+    aujourd_hui = date.today()
+    entreprise = getattr(request, 'entreprise', None)
+    if entreprise is None:
+        from django.http import HttpResponse
+        return HttpResponse("Aucune entreprise sélectionnée pour cet utilisateur.", status=400)
+
+
+    # Détermination de la période d'analyse
+    from datetime import timedelta, date as _date
+    if periode == 'today':
+        debut_periode = aujourd_hui
+        fin_periode   = aujourd_hui
+    elif periode == 'custom' and date_debut and date_fin:
+        debut_periode = _date.fromisoformat(date_debut)
+        fin_periode   = _date.fromisoformat(date_fin)
+    else:
+        jours = int(periode) if periode in ('7', '30', '90', '365') else 30
+        debut_periode = aujourd_hui - timedelta(days=jours)
+        fin_periode   = aujourd_hui
+
+    # Paiements liés aux factures émises sur la période
+    factures_periode_ids = list(Facture.objects.filter(
+        entreprise=entreprise,
+        date_emission__range=[debut_periode, fin_periode]
+    ).values_list('id', flat=True))
+
+    qs_encaisse = Paiement.objects.filter(
+        facture__entreprise=entreprise,
+        facture_id__in=factures_periode_ids
+    )
+    totaux_encaisse = qs_encaisse.aggregate(total=Sum('montant'))
+    total_encaisse_rapport = totaux_encaisse['total'] or Decimal('0')
+
+    # Créances impayées (rapport) sur la même période
+    totaux_rapport = Facture.objects.filter(
+        entreprise=entreprise,
+        id__in=factures_periode_ids,
+        statut__in=[Facture.Statut.EMISE, Facture.Statut.PARTIELLEMENT_PAYEE]
+    ).aggregate(
+        total_ttc=Sum('montant_ttc'),
+        total_paye=Sum('montant_paye'),
+    )
+    creances_rapport = (totaux_rapport['total_ttc'] or Decimal('0')) - (totaux_rapport['total_paye'] or Decimal('0'))
+
+    # Créances en retard (rapport) sur la même période
+    en_retard_rapport = Facture.objects.filter(
+        entreprise=entreprise,
+        id__in=factures_periode_ids,
+        statut__in=[Facture.Statut.EMISE, Facture.Statut.PARTIELLEMENT_PAYEE],
+        date_echeance__lt=aujourd_hui
+    ).count()
+
+    if periode == 'today':
+        debut_periode = aujourd_hui
+        fin_periode   = aujourd_hui
+        jours = 1
+    elif date_debut:
+        from datetime import datetime as dt
+        try:
+            debut_periode = dt.strptime(date_debut, '%Y-%m-%d').date()
+        except ValueError:
+            debut_periode = aujourd_hui - timedelta(days=30)
+        try:
+            fin_periode = dt.strptime(date_fin, '%Y-%m-%d').date() if date_fin else aujourd_hui
+        except ValueError:
+            fin_periode = aujourd_hui
+        jours = (fin_periode - debut_periode).days + 1
+        periode = 'custom'
+    else:
+        jours = int(periode) if periode in ('7', '30', '90', '365') else 30
+        debut_periode = aujourd_hui - timedelta(days=jours)
+        fin_periode   = aujourd_hui
+
+    # DEBUG : Statuts distincts des factures sur la période (placé après le calcul de la période)
+    statuts_periode = list(Facture.objects.filter(
+        entreprise=entreprise,
+        date_emission__gte=debut_periode,
+        date_emission__lte=fin_periode
+    ).values_list('statut', flat=True).distinct())
+
+
+
+
+    entreprise = getattr(request, 'entreprise', None)
+    if entreprise is None:
+        from django.http import HttpResponse
+        return HttpResponse("Aucune entreprise sélectionnée pour cet utilisateur.", status=400)
+
+
+    # ...calcul de debut_periode et fin_periode...
+
+    # ── Période sélectionnée ──────────────────────────────────────────────────
+    periode    = request.GET.get('periode', '30')
+    date_debut = request.GET.get('date_debut', '')
+    date_fin   = request.GET.get('date_fin', '')
+
+    if periode == 'today':
+        debut_periode = aujourd_hui
+        fin_periode   = aujourd_hui
+        jours = 1
+    elif date_debut:
+        from datetime import datetime as dt
+        try:
+            debut_periode = dt.strptime(date_debut, '%Y-%m-%d').date()
+        except ValueError:
+            debut_periode = aujourd_hui - timedelta(days=30)
+        try:
+            fin_periode = dt.strptime(date_fin, '%Y-%m-%d').date() if date_fin else aujourd_hui
+        except ValueError:
+            fin_periode = aujourd_hui
+        jours = (fin_periode - debut_periode).days + 1
+        periode = 'custom'
+    else:
+        jours = int(periode) if periode in ('7', '30', '90', '365') else 30
+        debut_periode = aujourd_hui - timedelta(days=jours)
+        fin_periode   = aujourd_hui
+
+    # DEBUG : Factures trouvées pour l'entreprise courante et la période filtrée (sans filtre statut)
+    factures_periode = []
+    try:
+        factures_periode = list(Facture.objects.filter(
+            entreprise=entreprise,
+            date_emission__gte=debut_periode,
+            date_emission__lte=fin_periode
+        ).values('id', 'statut', 'date_emission'))
+    except Exception as e:
+        factures_periode = [{'error': str(e)}]
+
+    # DEBUG : Compter les factures payées/partielles sur la période
+    debug_factures_count = 0  # valeur par défaut, sera calculée plus bas quand filtre_date sera dispo
+
+    # --- SIMULATION DE DONNÉES POUR TEST GRAPHIQUES SI AUCUNE DONNÉE ---
+    context = {}
+    inject_test_data = False
+
+    # ...calculs ORM réels plus bas...
+
     """Vue principale du tableau de bord."""
+
+    aujourd_hui = date.today()
     # Le superuser est redirigé vers son panneau de gestion de la plateforme
     if request.user.is_superuser:
         from django.shortcuts import redirect
         return redirect('tenants:platform')
-
-    entreprise = request.entreprise
-    aujourd_hui = date.today()
 
     # ── Période sélectionnée ──────────────────────────────────────────────────
     periode    = request.GET.get('periode', '30')
@@ -70,11 +212,32 @@ def index(request):
     else:
         filtre_date = {'date_emission__gte': debut_periode}
 
+    # DEBUG : Compter les factures payées/partielles/émises sur la période
+    debug_factures_count = Facture.objects.filter(
+        entreprise=entreprise,
+        statut__in=["payee", "partielle", "emise"],
+        **filtre_date
+    ).count()
+
+    # Bénéfice actuel (ventes réalisées, y compris remboursées/retournées)
+    benefice_actuel = LigneFacture.objects.filter(
+        facture__entreprise=entreprise,
+        facture__statut__in=["payee", "partielle", "emise"],
+        **{'facture__' + k: v for k, v in filtre_date.items()}
+    ).aggregate(
+        total=Sum((F('prix_unitaire_ht') - F('produit__prix_achat')) * F('quantite'))
+    )['total'] or Decimal('0')
+
+    # Bénéfice total estimé sur le stock restant
+    benefice_stock = Produit.objects.filter(entreprise=entreprise, actif=True).aggregate(
+        total=Sum((F('prix_vente') - F('prix_achat')) * F('quantite_stock'))
+    )['total'] or Decimal('0')
+
     # ── KPIs ──────────────────────────────────────────────────────────────────
     # Chiffre d'affaires de la période
     ca_periode = Facture.objects.filter(
         entreprise=entreprise,
-        statut__in=[Facture.Statut.PAYEE, Facture.Statut.PARTIELLEMENT_PAYEE],
+        statut__in=["payee", "partielle", "emise"],
         **filtre_date
     ).aggregate(total=Sum('montant_ttc'))['total'] or Decimal('0')
 
@@ -84,7 +247,7 @@ def index(request):
         debut_precedent = debut_periode - timedelta(days=jours)
         ca_precedent = Facture.objects.filter(
             entreprise=entreprise,
-            statut__in=[Facture.Statut.PAYEE, Facture.Statut.PARTIELLEMENT_PAYEE],
+            statut__in=["payee", "partielle", "emise"],
             date_emission__range=[debut_precedent, debut_periode]
         ).aggregate(total=Sum('montant_ttc'))['total'] or Decimal('0')
         if ca_precedent > 0:
@@ -93,9 +256,19 @@ def index(request):
     # Nombre de ventes (factures émises)
     nb_ventes = Facture.objects.filter(
         entreprise=entreprise,
-        statut__in=[Facture.Statut.EMISE, Facture.Statut.PAYEE, Facture.Statut.PARTIELLEMENT_PAYEE],
+        statut__in=["emise", "payee", "partielle"],
         **filtre_date
     ).count()
+    ventes_par_jour = Facture.objects.filter(
+        entreprise=entreprise,
+        statut__in=["payee", "partielle", "emise"],
+        **filtre_date
+    ).annotate(
+        jour=TruncDay('date_emission')
+    ).values('jour').annotate(
+        total=Sum('montant_ttc'),
+        count=Count('id')
+    ).order_by('jour')
 
     # Valeur totale du stock
     valeur_stock = Produit.objects.filter(
@@ -112,32 +285,26 @@ def index(request):
     # Créances impayées
     creances = Facture.objects.filter(
         entreprise=entreprise,
-        statut__in=[Facture.Statut.EMISE, Facture.Statut.PARTIELLEMENT_PAYEE]
+        statut__in=["emise", "partielle"]
     ).aggregate(
         total=Sum(F('montant_ttc') - F('montant_paye'))
     )['total'] or Decimal('0')
 
     nb_factures_impayees = Facture.objects.filter(
         entreprise=entreprise,
-        statut__in=[Facture.Statut.EMISE, Facture.Statut.PARTIELLEMENT_PAYEE]
+        statut__in=["emise", "partielle"]
     ).count()
 
-    # ── Graphique ventes journalières ─────────────────────────────────────────
-    ventes_par_jour = Facture.objects.filter(
-        entreprise=entreprise,
-        statut__in=[Facture.Statut.PAYEE, Facture.Statut.PARTIELLEMENT_PAYEE],
-        **filtre_date
-    ).annotate(
-        jour=TruncDay('date_emission')
-    ).values('jour').annotate(
-        total=Sum('montant_ttc'),
-        count=Count('id')
-    ).order_by('jour')
 
+    # ── Graphique ventes journalières ─────────────────────────────────────────
     labels_ventes = []
     data_ventes = []
     for v in ventes_par_jour:
-        labels_ventes.append(v['jour'].strftime('%d/%m'))
+        jour = v['jour']
+        if hasattr(jour, 'strftime'):
+            labels_ventes.append(jour.strftime('%d/%m'))
+        else:
+            labels_ventes.append(str(jour))
         data_ventes.append(int(v['total']))
 
     # ── Alertes stock faible ──────────────────────────────────────────────────
@@ -155,7 +322,7 @@ def index(request):
     # ── Top produits vendus ───────────────────────────────────────────────────
     top_produits = LigneFacture.objects.filter(
         facture__entreprise=entreprise,
-        facture__statut__in=[Facture.Statut.PAYEE, Facture.Statut.PARTIELLEMENT_PAYEE],
+        facture__statut__in=["payee", "partielle", "emise"],
         **{'facture__' + k: v for k, v in filtre_date.items()}
     ).values(
         'produit__nom', 'produit__reference'
@@ -178,11 +345,28 @@ def index(request):
     labels_cat = [r['produit__categorie__nom'] for r in repartition_categories]
     data_cat = [int(r['total']) for r in repartition_categories]
 
+    # Évolution mensuelle du bénéfice réalisé
+    benefices_mois = LigneFacture.objects.filter(
+        facture__entreprise=entreprise,
+        facture__statut__in=["payee", "partielle", "emise"],
+        **{'facture__' + k: v for k, v in filtre_date.items()}
+    ).annotate(
+        mois=TruncMonth('facture__date_emission')
+    ).values('mois').annotate(
+        total=Sum((F('prix_unitaire_ht') - F('produit__prix_achat')) * F('quantite'))
+    ).order_by('mois')
+
+    labels_benefices = [b['mois'].strftime('%m/%Y') for b in benefices_mois]
+    data_benefices = [float(b['total']) if b['total'] else 0 for b in benefices_mois]
+
     context = {
+        'factures_periode': factures_periode,
+        'statuts_periode': statuts_periode,
+        'debug_factures_count': debug_factures_count,
         'periode': periode,
         'jours': jours,
-        'date_debut': date_debut,
-        'date_fin': date_fin,
+        'date_debut': debut_periode,
+        'date_fin': fin_periode,
         # KPIs
         'ca_periode': ca_periode,
         'evolution_ca': evolution_ca,
@@ -191,15 +375,21 @@ def index(request):
         'nb_articles': nb_articles,
         'creances': creances,
         'nb_factures_impayees': nb_factures_impayees,
+        'benefice_actuel': benefice_actuel,
+        'benefice_stock': benefice_stock,
         # Graphiques
-        'labels_ventes': json_safe(labels_ventes),
-        'data_ventes': json_safe(data_ventes),
-        'labels_categories': json_safe(labels_cat),
-        'data_categories': json_safe(data_cat),
+        'labels_benefices': json_safe(labels_benefices),
+        'data_benefices': json_safe(data_benefices),
+        # Debug ORM ventes par jour
+        'debug_ventes_par_jour': list(ventes_par_jour),
         # Listes
         'produits_alerte': produits_alerte,
         'dernieres_factures': dernieres_factures,
         'top_produits': top_produits,
+        # Debug comparaison créances
+        'creances_rapport': creances_rapport,
+        'en_retard_rapport': en_retard_rapport,
+        'total_encaisse_rapport': total_encaisse_rapport,
     }
 
     return render(request, 'dashboard/index.html', context)

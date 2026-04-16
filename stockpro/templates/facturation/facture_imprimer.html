@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facture {{ facture.numero }} — {{ entreprise.nom }}</title>
     {% load static humanize %}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #222; background: #fff; }
 
@@ -167,9 +167,9 @@
                 <td class="fw-semibold">{{ ligne.designation }}</td>
                 <td class="text-muted small">{{ ligne.reference|default:"—" }}</td>
                 <td class="text-center">{{ ligne.quantite }}</td>
-                <td class="text-end">{{ ligne.prix_unitaire_ht|intcomma }}</td>
+                <td class="text-end">{{ ligne.prix_unitaire_ht|floatformat:2|intcomma }}</td>
                 <td class="text-center text-muted">{% if ligne.remise %}{{ ligne.remise }}%{% else %}—{% endif %}</td>
-                <td class="text-end fw-semibold">{{ ligne.montant_ht|floatformat:0|intcomma }}</td>
+                <td class="text-end fw-semibold">{{ ligne.montant_ht|floatformat:2|intcomma }}</td>
             </tr>
             {% empty %}
             <tr><td colspan="7" class="text-center text-muted py-3">Aucune ligne</td></tr>
@@ -183,7 +183,7 @@
             <table class="totaux-table w-100">
                 <tr>
                     <td class="text-muted">Sous-total HT</td>
-                    <td class="text-end">{{ facture.montant_ht|intcomma }} {{ entreprise.devise }}</td>
+                    <td class="text-end">{{ facture.montant_ht|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
                 </tr>
                 {% if facture.remise_globale and facture.remise_globale > 0 %}
                 <tr>
@@ -193,23 +193,23 @@
                 {% endif %}
                 <tr>
                     <td class="text-muted">TVA ({{ facture.taux_tva }}%)</td>
-                    <td class="text-end">{{ facture.montant_tva|intcomma }} {{ entreprise.devise }}</td>
+                    <td class="text-end">{{ facture.montant_tva|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
                 </tr>
                 <tr class="total-ttc">
                     <td class="py-2">TOTAL TTC</td>
-                    <td class="text-end py-2">{{ facture.montant_ttc|intcomma }} {{ entreprise.devise }}</td>
+                    <td class="text-end py-2">{{ facture.montant_ttc|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
                 </tr>
                 {% if facture.montant_paye > 0 %}
                 <tr>
                     <td class="text-success">Déjà payé</td>
-                    <td class="text-end text-success">- {{ facture.montant_paye|intcomma }} {{ entreprise.devise }}</td>
+                    <td class="text-end text-success">- {{ facture.montant_paye|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
                 </tr>
                 <tr>
                     <td class="fw-bold {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
                         Reste dû
                     </td>
                     <td class="text-end fw-bold {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
-                        {{ facture.montant_restant|intcomma }} {{ entreprise.devise }}
+                        {{ facture.montant_restant|floatformat:2|intcomma }} {{ entreprise.devise }}
                     </td>
                 </tr>
                 {% endif %}
@@ -246,7 +246,7 @@
                     <td>{{ p.date_paiement|date:"d/m/Y" }}</td>
                     <td>{{ p.get_mode_paiement_display }}</td>
                     <td class="text-muted">{{ p.reference_paiement|default:"—" }}</td>
-                    <td class="text-end fw-semibold text-success">{{ p.montant|intcomma }} {{ entreprise.devise }}</td>
+                    <td class="text-end fw-semibold text-success">{{ p.montant|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

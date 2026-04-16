@@ -16,7 +16,7 @@
                 </div>
                 <div>
                     <div class="text-muted small">Total dû</div>
-                    <div class="fw-bold fs-4 text-danger">{{ total_du|intcomma }} <small class="text-muted fw-normal fs-6">FCFA</small></div>
+                    <div class="fw-bold fs-4 text-danger">{{ total_du|floatformat:2|intcomma }} <small class="text-muted fw-normal fs-6">FCFA</small></div>
                 </div>
             </div>
         </div>
@@ -115,9 +115,9 @@
                         <br><span class="badge bg-danger" style="font-size:.65rem;">En retard</span>
                         {% endif %}
                     </td>
-                    <td class="text-end small">{{ f.montant_ttc|intcomma }}</td>
-                    <td class="text-end small text-success">{{ f.montant_paye|intcomma }}</td>
-                    <td class="text-end fw-bold text-danger small">{{ f.montant_restant|intcomma }}</td>
+                    <td class="text-end small">{{ f.montant_ttc|floatformat:2|intcomma }}</td>
+                    <td class="text-end small text-success">{{ f.montant_paye|floatformat:2|intcomma }}</td>
+                    <td class="text-end fw-bold text-danger small">{{ f.montant_restant|floatformat:2|intcomma }}</td>
                     <td>
                         <div class="progress" style="height:6px;">
                             <div class="progress-bar bg-success" style="width:{{ f.taux_paiement }}%"></div>
@@ -132,7 +132,7 @@
                     <td class="text-center">
                         <!-- Paiement rapide intégral -->
                         <form method="post" action="{% url 'facturation:facture_detail' f.pk %}"
-                              onsubmit="return confirm('Solder {{ f.numero }} ({{ f.montant_restant|intcomma }} FCFA) ?')"
+                              onsubmit="return confirm('Solder {{ f.numero }} ({{ f.montant_restant|floatformat:2|intcomma }} FCFA) ?')"
                               class="d-inline">
                             {% csrf_token %}
                             <input type="hidden" name="mode_integral" value="especes">
@@ -165,7 +165,7 @@
                 <tr>
                     <td colspan="4" class="small">Total ({{ nb_factures }} factures)</td>
                     <td colspan="2"></td>
-                    <td class="text-end text-danger">{{ total_du|intcomma }} FCFA</td>
+                    <td class="text-end text-danger">{{ total_du|floatformat:2|intcomma }} FCFA</td>
                     <td colspan="3"></td>
                 </tr>
             </tfoot>
