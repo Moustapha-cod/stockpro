@@ -257,7 +257,7 @@
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1 paiement-type-btn"
                                 onclick="setType('dette', this)">
-                            <i class="bi bi-hourglass me-1"></i>Dette
+                            <i class="bi bi-hourglass me-1"></i>Créance
                         </button>
                     </div>
                 </div>
@@ -294,7 +294,7 @@
                     </form>
                 </div>
 
-                <!-- Paiement partiel / dette -->
+                <!-- Paiement partiel / créance -->
                 <div id="form-tranche" style="display:none;">
                     <form method="post">
                         {% csrf_token %}
@@ -396,7 +396,7 @@ function setType(type, btn) {
                 if (opt.value === 'credit') { modeSelect.value = 'credit'; break; }
             }
         }
-        if (btnValider) { btnValider.className = 'btn btn-warning btn-sm w-100 text-dark'; btnValider.innerHTML = '<i class="bi bi-hourglass me-1"></i>Enregistrer la dette'; }
+        if (btnValider) { btnValider.className = 'btn btn-warning btn-sm w-100 text-dark'; btnValider.innerHTML = '<i class="bi bi-hourglass me-1"></i>Enregistrer la créance'; }
     }
 }
 

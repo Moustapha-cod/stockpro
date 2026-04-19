@@ -312,9 +312,9 @@ def paiement_liste(request):
     total_encaisse = totaux['total'] or Decimal('0')
     nb_paiements   = totaux['nb'] or 0
 
-    # Total dettes (mode crédit)
-    total_dettes = qs.filter(mode_paiement='credit').aggregate(t=Sum('montant'))['t'] or Decimal('0')
-    total_reel   = total_encaisse - total_dettes
+    # Encaissement réel = paiements cash uniquement (hors crédit différé)
+    total_credit = qs.filter(mode_paiement='credit').aggregate(t=Sum('montant'))['t'] or Decimal('0')
+    total_reel   = total_encaisse - total_credit
 
     # Répartition par mode
     par_mode = qs.values('mode_paiement').annotate(total=Sum('montant'), nb=Count('id')).order_by('-total')
@@ -328,7 +328,6 @@ def paiement_liste(request):
         'date_fin': date_fin,
         'total_encaisse': total_encaisse,
         'total_reel': total_reel,
-        'total_dettes': total_dettes,
         'nb_paiements': nb_paiements,
         'par_mode': par_mode,
     }
