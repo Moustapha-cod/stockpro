@@ -8,11 +8,15 @@ LOGFILE="deploy_$(date +%Y%m%d_%H%M%S).log"
 # 1. Aller dans le dossier du projet
 cd /home/ubuntu/stockpro
 
-# 2. Sauvegarde base SQLite (si utilisée)
-if grep -q 'sqlite3' stockpro/settings.py; then
-  echo "[Sauvegarde] Sauvegarde base SQLite..." | tee -a "$LOGFILE"
-  cp stockpro/db.sqlite3 backups/db_$(date +%Y%m%d_%H%M%S).sqlite3 || true
-fi
+# 2. Sauvegarde base PostgreSQL (avant migrations)
+echo "[Sauvegarde] Sauvegarde base PostgreSQL..." | tee -a "$LOGFILE"
+# À personnaliser : renseigner les variables ci-dessous
+PGUSER="stockpro_user"
+PGDATABASE="stockpro_db"
+PGHOST="localhost"
+BACKUP_DIR="backups"
+mkdir -p "$BACKUP_DIR"
+pg_dump -U "$PGUSER" -h "$PGHOST" "$PGDATABASE" > "$BACKUP_DIR/pg_backup_$(date +%Y%m%d_%H%M%S).sql" 2>> "$LOGFILE" || echo "[WARN] Sauvegarde PostgreSQL échouée !" | tee -a "$LOGFILE"
 
 # 3. Mise à jour du code
 {
@@ -63,6 +67,6 @@ fi
 } 2>&1 | tee -a "$LOGFILE"
 
 # Notification mail (optionnel)
-# mail -s "Déploiement terminé" admin@domaine.com < "$LOGFILE"
+ mail -s "Déploiement terminé" taphambaye965@gmail.com < "$LOGFILE"
 
 exit 0
