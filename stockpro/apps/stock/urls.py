@@ -29,4 +29,7 @@ urlpatterns = [
     # Inventaire
     path('inventaire/', views.inventaire, name='inventaire'),
     path('inventaire/export/', views.inventaire_export, name='inventaire_export'),
+
+    # API
+    path('api/produits/', views.api_produits_search, name='api_produits_search'),
 ]

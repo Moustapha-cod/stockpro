@@ -10,7 +10,9 @@
     #lignes-table th, #lignes-table td { padding: .4rem .5rem; }
     #lignes-table .form-control-sm,
     #lignes-table .form-select-sm { font-size: .82rem; }
-    #lignes-table .col-produit  { min-width: 220px; }
+    #lignes-table .col-produit  { min-width: 260px; }
+    .ts-wrapper.form-select-sm { padding: 0; }
+    .ts-control { font-size: .82rem !important; min-height: 31px !important; }
     #lignes-table .col-design   { min-width: 200px; }
     #lignes-table .col-qte      { width: 80px; }
     #lignes-table .col-prix     { width: 120px; }
@@ -353,9 +355,66 @@
         tbody.appendChild(newRow);
         totalForms++;
         document.getElementById('id_lignes-TOTAL_FORMS').value = totalForms;
+
+        // Initialiser Tom Select sur le nouveau select produit
+        var newSelect = newRow.querySelector('.ligne-produit');
+        if (newSelect) initTomSelectProduit(newSelect);
     });
 
     recalculer();
 })();
+</script>
+
+<script>
+// ── Tom Select : recherche produit avec AJAX ───────────────────────────────
+var API_URL = '{% url "stock:api_produits_search" %}';
+
+function initTomSelectProduit(selectEl) {
+    if (selectEl.tomselect) return; // déjà initialisé
+    new TomSelect(selectEl, {
+        valueField: 'value',
+        labelField: 'text',
+        searchField: ['text'],
+        placeholder: 'Rechercher un produit…',
+        load: function(query, callback) {
+            if (!query.length) return callback();
+            fetch(API_URL + '?q=' + encodeURIComponent(query))
+                .then(r => r.json())
+                .then(data => callback(data.results))
+                .catch(() => callback());
+        },
+        onChange: function(value) {
+            // Auto-remplissage prix et désignation depuis les données déjà chargées
+            var row = selectEl.closest('tr');
+            if (!row || !value) return;
+            var produitsEl = document.getElementById('produits-data');
+            var PRODUITS = produitsEl ? JSON.parse(produitsEl.textContent) : {};
+            var p = PRODUITS[value];
+            if (p) {
+                var prixInput = row.querySelector('[name$="-prix_unitaire_ht"]');
+                var desigInput = row.querySelector('[name$="-designation"]');
+                if (prixInput && (!prixInput.value || prixInput.value === '0')) prixInput.value = p.prix_vente;
+                if (desigInput && !desigInput.value) desigInput.value = p.nom;
+                // Déclencher le recalcul
+                prixInput && prixInput.dispatchEvent(new Event('input', {bubbles: true}));
+            }
+        },
+        render: {
+            option: function(item, escape) {
+                const couleur = item.statut === 'rupture' ? '#dc3545' : item.statut === 'alerte' ? '#fd7e14' : '#198754';
+                return `<div class="d-flex justify-content-between align-items-center py-1">
+                    <span style="font-size:.82rem">${escape(item.text)}</span>
+                    <span style="font-size:.72rem;color:${couleur}" class="ms-2">Stock : ${escape(String(item.stock))}</span>
+                </div>`;
+            },
+        },
+        shouldLoad: function(query) { return query.length >= 1; },
+    });
+}
+
+// Initialiser sur toutes les lignes existantes
+document.querySelectorAll('.ligne-produit').forEach(function(el) {
+    initTomSelectProduit(el);
+});
 </script>
 {% endblock %}

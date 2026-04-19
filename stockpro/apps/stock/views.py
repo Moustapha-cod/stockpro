@@ -1,12 +1,13 @@
 """apps/stock/views.py — CRUD Produits, Catégories, Fournisseurs, Mouvements"""
 
 import csv
+import json
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, F, Sum
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 
 from .models import Produit, ProduitPhoto, Categorie, Fournisseur, MouvementStock
@@ -415,5 +416,39 @@ def inventaire_export(request):
         round(totaux['valeur_achat'] or 0, 0),
         round(totaux['valeur_vente'] or 0, 0),
     ])
+
+
+# ── API recherche produits (Tom Select) ───────────────────────────────────────
+
+@login_required
+def api_produits_search(request):
+    """Retourne une liste JSON de produits filtrés par nom, référence ou code-barres."""
+    entreprise = request.entreprise
+    q = request.GET.get('q', '').strip()
+
+    qs = Produit.objects.filter(entreprise=entreprise, actif=True)
+    if q:
+        qs = qs.filter(
+            Q(nom__icontains=q) |
+            Q(reference__icontains=q) |
+            Q(code_barre__icontains=q)
+        )
+
+    qs = qs.select_related('categorie').order_by('nom')[:30]
+
+    results = []
+    for p in qs:
+        label = p.nom
+        if p.reference:
+            label += f' [{p.reference}]'
+        results.append({
+            'value': str(p.pk),
+            'text': label,
+            'stock': p.quantite_stock,
+            'prix': str(p.prix_vente or 0),
+            'statut': p.statut_stock,
+        })
+
+    return JsonResponse({'results': results})
 
     return response

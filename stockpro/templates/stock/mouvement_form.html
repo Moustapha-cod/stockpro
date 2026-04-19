@@ -3,6 +3,16 @@
 {% block title %}Nouveau mouvement — StockPro SN{% endblock %}
 {% block page_title %}Enregistrer un mouvement de stock{% endblock %}
 
+{% block extra_css %}
+<style>
+.ts-wrapper { width: 100%; }
+.produit-option-stock { font-size:.75rem; }
+.produit-option-stock.rupture { color:#dc3545; }
+.produit-option-stock.alerte  { color:#fd7e14; }
+.produit-option-stock.normal  { color:#198754; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-7">
@@ -52,4 +62,32 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new TomSelect('#id_produit', {
+    valueField: 'value',
+    labelField: 'text',
+    searchField: ['text'],
+    placeholder: 'Tapez un nom, une référence ou un code-barres…',
+    load: function(query, callback) {
+        if (!query.length) return callback();
+        fetch('{% url "stock:api_produits_search" %}?q=' + encodeURIComponent(query))
+            .then(r => r.json())
+            .then(data => callback(data.results))
+            .catch(() => callback());
+    },
+    render: {
+        option: function(item, escape) {
+            const couleur = item.statut === 'rupture' ? 'rupture' : item.statut === 'alerte' ? 'alerte' : 'normal';
+            return `<div class="d-flex justify-content-between align-items-center py-1">
+                <span>${escape(item.text)}</span>
+                <span class="produit-option-stock ${couleur} ms-2">Stock : ${escape(String(item.stock))}</span>
+            </div>`;
+        },
+    },
+    shouldLoad: function(query) { return query.length >= 1; },
+});
+</script>
 {% endblock %}
