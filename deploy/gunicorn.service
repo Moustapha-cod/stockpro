@@ -8,7 +8,7 @@ Group=www-data
 WorkingDirectory=/home/ubuntu/stockpro/stockpro
 ExecStart=/home/ubuntu/stockpro/venv/bin/gunicorn --access-logfile - --workers 3 --bind unix:/home/ubuntu/stockpro/stockpro/gunicorn.sock stockpro.wsgi:application
 Environment="PATH=/home/ubuntu/stockpro/venv/bin"
-Environment="PYTHONPATH=/home/ubuntu/stockpro/stockpro"
+Environment="PYTHONPATH=/home/ubuntu/stockpro"
 Environment="DJANGO_SETTINGS_MODULE=stockpro.settings"
 Restart=always
 

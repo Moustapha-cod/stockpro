@@ -33,7 +33,7 @@ pg_dump -U "$PGUSER" -h "$PGHOST" "$PGDATABASE" > "$BACKUP_DIR/pg_backup_$(date 
   pip install -r requirements.txt
 
   # 6. Vérification fichiers critiques
-  for f in .env stockpro/stockpro/settings.py requirements.txt; do
+  for f in .env stockpro/settings.py requirements.txt; do
     if [ ! -f "$f" ]; then
       echo "[ERREUR] Fichier manquant : $f" | tee -a "$LOGFILE"
       exit 1
@@ -42,7 +42,7 @@ pg_dump -U "$PGUSER" -h "$PGHOST" "$PGDATABASE" > "$BACKUP_DIR/pg_backup_$(date 
 
   # 7. Migrations Django
   echo "[5/9] Migrations Django..."
-  export PYTHONPATH=/home/ubuntu/stockpro/stockpro
+  export PYTHONPATH=/home/ubuntu/stockpro
   cd stockpro
   python manage.py showmigrations > ../migrations_avant.txt
   python manage.py migrate | tee -a "../$LOGFILE"
