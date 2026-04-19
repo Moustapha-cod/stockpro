@@ -182,6 +182,52 @@
         </div>
         <div class="d-flex align-items-center gap-3">
             <span class="text-muted small d-none d-md-inline">{{ user.email }}</span>
+
+            {% if not user.is_superuser and nb_alertes_total %}
+            <!-- Cloche d'alertes stock -->
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-warning position-relative d-flex align-items-center gap-1"
+                        type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-bell-fill"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                          style="font-size:.6rem;">
+                        {{ nb_alertes_total }}
+                    </span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width:260px;">
+                    <li class="px-3 py-2 border-bottom">
+                        <span class="fw-semibold small text-dark">
+                            <i class="bi bi-bell me-1 text-warning"></i>Alertes stock
+                        </span>
+                    </li>
+                    {% if nb_ruptures %}
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2 py-2"
+                           href="{% url 'stock:produit_liste' %}?statut=rupture">
+                            <span class="badge bg-danger rounded-pill">{{ nb_ruptures }}</span>
+                            <span class="small">produit{{ nb_ruptures|pluralize }} en rupture</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% if nb_alertes %}
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2 py-2"
+                           href="{% url 'stock:produit_liste' %}?statut=alerte">
+                            <span class="badge bg-warning text-dark rounded-pill">{{ nb_alertes }}</span>
+                            <span class="small">produit{{ nb_alertes|pluralize }} sous le seuil</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="border-top">
+                        <a class="dropdown-item small text-center text-muted py-2"
+                           href="{% url 'stock:produit_liste' %}?statut=alerte">
+                            Voir tous les produits en alerte
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            {% endif %}
+
             <form method="post" action="{% url 'accounts:logout' %}">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1">

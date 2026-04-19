@@ -104,6 +104,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.tenants.context_processors.current_tenant',  # Injecte l'entreprise courante
+                'apps.stock.context_processors.alertes_stock',    # Injecte les compteurs d'alertes stock
             ],
         },
     },
