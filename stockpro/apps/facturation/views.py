@@ -101,9 +101,9 @@ def facture_detail(request, pk):
             reference_document=facture.numero
         ).aggregate(total=models.Sum('quantite'))['total'] or 0
         quantite_restante = ligne.quantite - deja_retournee
-        if quantite_restante > 0:
-            ligne.quantite_restante = quantite_restante
-            lignes.append(ligne)
+        ligne.quantite_retournee = deja_retournee
+        ligne.quantite_restante = quantite_restante
+        lignes.append(ligne)
 
     # Si la facture n'a plus aucune ligne, la laisser visible pour la traçabilité
     if not lignes and facture.statut != Facture.Statut.ANNULEE:

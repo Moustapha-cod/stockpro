@@ -85,7 +85,9 @@
                         <tr>
                             <th>Désignation</th>
                             <th>Réf.</th>
-                            <th class="text-center">Qté</th>
+                            <th class="text-center">Qté initiale</th>
+                            <th class="text-center">Qté retournée</th>
+                            <th class="text-center">Qté restante</th>
                             <th class="text-end">PU HT</th>
                             <th class="text-center">Remise</th>
                             <th class="text-end">Total HT</th>
@@ -96,7 +98,9 @@
                         <tr>
                             <td class="fw-semibold small">{{ ligne.designation }}</td>
                             <td class="small text-muted">{{ ligne.reference|default:"—" }}</td>
-                            <td class="text-center small">{{ ligne.quantite_restante|default:ligne.quantite }}</td>
+                            <td class="text-center small">{{ ligne.quantite }}</td>
+                            <td class="text-center small">{{ ligne.quantite_retournee }}</td>
+                            <td class="text-center small">{{ ligne.quantite_restante }}</td>
                             <td class="text-end small">{{ ligne.prix_unitaire_ht|floatformat:2|intcomma }}</td>
                             <td class="text-center small">{% if ligne.remise %}{{ ligne.remise }}%{% else %}—{% endif %}</td>
                             <td class="text-end small fw-semibold">{{ ligne.montant_ht|floatformat:2|intcomma }}</td>

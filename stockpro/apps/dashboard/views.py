@@ -530,7 +530,19 @@ def rapport_ventes(request):
     )
     ca = totaux['ca'] or Decimal('0')
     nb_factures = totaux['nb_factures'] or 0
+    montant_paye = totaux['montant_paye'] or Decimal('0')
     panier_moyen = (ca / nb_factures) if nb_factures else Decimal('0')
+
+    # Encaissement réel = total encaissé hors paiements à crédit
+    from apps.facturation.models import Paiement
+    paiements_qs = Paiement.objects.filter(
+        entreprise=entreprise,
+        date_paiement__gte=debut,
+        date_paiement__lte=fin
+    )
+    total_encaisse = paiements_qs.aggregate(total=Sum('montant'))['total'] or Decimal('0')
+    total_dettes = paiements_qs.filter(mode_paiement='credit').aggregate(t=Sum('montant'))['t'] or Decimal('0')
+    encaissement_reel = total_encaisse - total_dettes
 
     # Créances en cours
     creances = Facture.objects.filter(
@@ -596,6 +608,7 @@ def rapport_ventes(request):
         'date_debut': date_debut,
         'date_fin': date_fin,
         'ca': ca,
+        'encaissement_reel': encaissement_reel,
         'nb_factures': nb_factures,
         'panier_moyen': panier_moyen,
         'creances': creances,

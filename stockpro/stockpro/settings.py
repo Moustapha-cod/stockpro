@@ -21,6 +21,12 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Ajout pour la fiabilité CSRF en production
+CSRF_TRUSTED_ORIGINS = [
+    "https://stockpro.pro",
+    "https://www.stockpro.pro"
+]
+
 try:
     SECRET_KEY = config('SECRET_KEY')
 except UndefinedValueError:

@@ -363,8 +363,11 @@ class Paiement(TenantMixin):
         return f'Paiement {self.montant} FCFA — {self.facture.numero}'
 
     def _sync_facture(self):
-        """Recalcule et sauvegarde montant_paye + statut de la facture (jamais négatif)."""
-        total_paye = self.facture.paiements.aggregate(
+        """
+        Recalcule et sauvegarde montant_paye + statut de la facture (jamais négatif).
+        Les paiements de type 'credit' (dette) ne sont pas considérés comme encaissés.
+        """
+        total_paye = self.facture.paiements.exclude(mode_paiement=Facture.ModePaiement.CREDIT).aggregate(
             total=models.Sum('montant')
         )['total'] or Decimal('0')
         # Ne jamais descendre en dessous de zéro
@@ -381,8 +384,8 @@ class Paiement(TenantMixin):
         with transaction.atomic():
             facture = self.facture
             super().delete(*args, **kwargs)
-            # Recalcule après suppression
-            total_paye = facture.paiements.aggregate(
+            # Recalcule après suppression (hors dettes)
+            total_paye = facture.paiements.exclude(mode_paiement=Facture.ModePaiement.CREDIT).aggregate(
                 total=models.Sum('montant')
             )['total'] or Decimal('0')
             facture.montant_paye = total_paye
