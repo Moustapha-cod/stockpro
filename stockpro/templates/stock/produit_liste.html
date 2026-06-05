@@ -120,7 +120,7 @@
           <td>
             {% with extra=p.photos.all %}
             {% if p.image or extra %}
-            <div class="position-relative d-inline-block" style="cursor:zoom-in;" onclick="ouvrirGalerie(this)"
+            <div class="position-relative d-inline-block" style="cursor:zoom-in;" data-action="ouvrir-galerie"
                  data-nom="{{ p.nom }}" data-ref="{{ p.reference }}"
                  data-photos="[{% if p.image %}&quot;{{ p.image.url }}&quot;{% endif %}{% for ph in extra %}{% if p.image or not forloop.first %},{% endif %}&quot;{{ ph.image.url }}&quot;{% endfor %}]">
               {% if p.image %}
@@ -203,7 +203,7 @@
           <!-- Actions -->
           <td class="text-end">
             <button class="btn btn-sm btn-success btn-cart py-0 px-2 me-1"
-                    onclick="ajouterAuPanier(this)"
+                    data-action="ajouter-panier"
                     data-url="{% url 'stock:panier_ajouter' p.pk %}"
                     data-nom="{{ p.nom|escapejs }}"
                     title="Ajouter au panier"
@@ -246,7 +246,7 @@
            class="btn btn-primary" id="btn-creer-facture">
           <i class="bi bi-file-earmark-plus me-1"></i>Créer la facture
         </a>
-        <button class="btn btn-outline-danger btn-sm" onclick="viderPanier()">
+        <button class="btn btn-outline-danger btn-sm" id="btn-vider-panier">
           <i class="bi bi-trash me-1"></i>Vider le panier
         </button>
       </div>
@@ -279,10 +279,10 @@
       </div>
       <div class="modal-body p-0 bg-dark text-center position-relative" style="min-height:280px;">
         <img id="modalImg" src="" alt="" style="max-width:100%;max-height:72vh;object-fit:contain;">
-        <button id="btnPrev" onclick="nav(-1)"
+        <button id="btnPrev"
                 class="btn btn-light position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
                 style="width:36px;height:36px;opacity:.85;"><i class="bi bi-chevron-left"></i></button>
-        <button id="btnNext" onclick="nav(1)"
+        <button id="btnNext"
                 class="btn btn-light position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
                 style="width:36px;height:36px;opacity:.85;"><i class="bi bi-chevron-right"></i></button>
       </div>
@@ -294,7 +294,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // ── Données autocomplete ────────────────────────────────────────────────
 const MARQUES_PIECES  = {{ marques_pieces_json|safe }};
 const COMPAT_MARQUES  = {{ compat_marques_json|safe }};
@@ -386,14 +386,14 @@ function renderPanier() {
       </div>
       <div class="d-flex align-items-center gap-1">
         <button class="btn btn-outline-secondary btn-sm py-0 px-1"
-                onclick="majQuantite(${item.pk}, ${item.quantite - 1})">−</button>
+                data-action="maj-quantite" data-pk="${item.pk}" data-quantite="${item.quantite - 1}">−</button>
         <input type="number" class="form-control form-control-sm text-center py-0 px-1"
                style="width:44px;" value="${item.quantite}" min="1"
-               onchange="majQuantite(${item.pk}, +this.value)">
+               data-action="maj-quantite-input" data-pk="${item.pk}">
         <button class="btn btn-outline-secondary btn-sm py-0 px-1"
-                onclick="majQuantite(${item.pk}, ${item.quantite + 1})">+</button>
+                data-action="maj-quantite" data-pk="${item.pk}" data-quantite="${item.quantite + 1}">+</button>
         <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1"
-                onclick="retirerDuPanier(${item.pk})" title="Retirer"><i class="bi bi-x"></i></button>
+                data-action="retirer-panier" data-pk="${item.pk}" title="Retirer"><i class="bi bi-x"></i></button>
       </div>
     </div>
   `).join('');
@@ -448,6 +448,37 @@ function viderPanier() {
 }
 
 renderPanier();
+
+// ── Event delegation : table (galerie + panier) ─────────────────────────
+document.querySelector('.table tbody').addEventListener('click', function(e) {
+  const galerie = e.target.closest('[data-action="ouvrir-galerie"]');
+  if (galerie) { ouvrirGalerie(galerie); return; }
+  const cart = e.target.closest('[data-action="ajouter-panier"]');
+  if (cart) ajouterAuPanier(cart);
+});
+
+// ── Event delegation : panier offcanvas ────────────────────────────────
+document.getElementById('panier-liste').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const pk = parseInt(btn.dataset.pk);
+  if (btn.dataset.action === 'maj-quantite') {
+    majQuantite(pk, parseInt(btn.dataset.quantite));
+  } else if (btn.dataset.action === 'retirer-panier') {
+    retirerDuPanier(pk);
+  }
+});
+document.getElementById('panier-liste').addEventListener('change', function(e) {
+  const inp = e.target.closest('[data-action="maj-quantite-input"]');
+  if (inp) majQuantite(parseInt(inp.dataset.pk), +inp.value);
+});
+
+// ── Vider panier ────────────────────────────────────────────────────────
+document.getElementById('btn-vider-panier').addEventListener('click', viderPanier);
+
+// ── Modal galerie nav ───────────────────────────────────────────────────
+document.getElementById('btnPrev').addEventListener('click', () => nav(-1));
+document.getElementById('btnNext').addEventListener('click', () => nav(1));
 
 // ── Autocomplete marque pièce ───────────────────────────────────────────
 (function() {
