@@ -1,6 +1,6 @@
 """
 Commande Django : python manage.py seed_data
-Génère des données de test réalistes pour StockPro SN.
+Génère des données de test réalistes pour StockPro Automobile.
 """
 
 import random
@@ -87,7 +87,7 @@ CLIENTS = [
 
 
 class Command(BaseCommand):
-    help = 'Génère des données de test réalistes pour StockPro SN'
+    help = 'Génère des données de test réalistes pour StockPro Automobile'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -103,7 +103,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.MIGRATE_HEADING('\n=== StockPro SN — Génération de données de test ===\n'))
+        self.stdout.write(self.style.MIGRATE_HEADING('\n=== StockPro Automobile — Génération de données de test ===\n'))
 
         with transaction.atomic():
             if options['reset']:

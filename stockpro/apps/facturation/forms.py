@@ -56,6 +56,12 @@ class FactureForm(forms.ModelForm):
             raise forms.ValidationError("Client invalide.")
         return client
 
+    def clean_remise_globale(self):
+        remise = self.cleaned_data.get('remise_globale')
+        if remise is not None and not (Decimal('0') <= remise <= Decimal('100')):
+            raise forms.ValidationError("La remise doit être comprise entre 0 et 100 %.")
+        return remise or Decimal('0')
+
 
 class LigneFactureForm(forms.ModelForm):
     class Meta:
@@ -84,6 +90,8 @@ class LigneFactureForm(forms.ModelForm):
         remise = self.cleaned_data.get('remise')
         if remise is None:
             return Decimal('0')
+        if not (Decimal('0') <= remise <= Decimal('100')):
+            raise forms.ValidationError("La remise doit être comprise entre 0 et 100 %.")
         return remise
 
     def clean_produit(self):

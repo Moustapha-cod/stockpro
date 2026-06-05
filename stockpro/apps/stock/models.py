@@ -97,7 +97,32 @@ class Produit(TenantMixin):
         _('Modèle(s) compatible(s)'),
         max_length=200,
         blank=True,
-        help_text=_('Ex: Toyota Corolla 2010-2020, Peugeot 206')
+        help_text=_('Ex: Renault Trucks T, Mercedes Actros, Peugeot Partner')
+    )
+
+    class TypeVehicule(models.TextChoices):
+        POIDS_LOURD   = 'PL',   _('Poids Lourd')
+        VEHICULE_LEGER = 'VL',  _('Véhicule Léger')
+        TOUS          = 'TOUS', _('PL & VL')
+
+    type_vehicule = models.CharField(
+        _('Type de véhicule'),
+        max_length=4,
+        choices=TypeVehicule.choices,
+        default=TypeVehicule.TOUS,
+        blank=True,
+    )
+    reference_oem = models.CharField(
+        _('Référence OEM'),
+        max_length=100,
+        blank=True,
+        help_text=_('Référence constructeur officielle (ex: 3C0 615 301 D)')
+    )
+    reference_equivalente = models.CharField(
+        _('Réf. équivalente / cross-ref'),
+        max_length=200,
+        blank=True,
+        help_text=_('Références équivalentes d\'autres marques (ex: ATE 24.0120, LPR BK1030)')
     )
 
     # Tarification
@@ -229,6 +254,64 @@ class Produit(TenantMixin):
         return 'normal'
 
 
+class CompatibiliteVehicule(models.Model):
+    """Compatibilité d'une pièce avec un type de véhicule (marque / modèle / années / carburant)."""
+
+    CARBURANT_CHOICES = [
+        ('tous',      'Tous carburants'),
+        ('diesel',    'Diesel'),
+        ('essence',   'Essence'),
+        ('gnv',       'GNV / GNC'),
+        ('hybride',   'Hybride'),
+        ('electrique','Électrique'),
+        ('gpl',       'GPL'),
+    ]
+
+    produit = models.ForeignKey(
+        Produit,
+        on_delete=models.CASCADE,
+        related_name='compatibilites',
+        verbose_name=_('Produit')
+    )
+    marque = models.CharField(_('Marque'), max_length=100)
+    modele = models.CharField(_('Modèle'), max_length=200, blank=True)
+    annee_debut = models.PositiveSmallIntegerField(_('Année début'), null=True, blank=True)
+    annee_fin   = models.PositiveSmallIntegerField(_('Année fin'),   null=True, blank=True)
+    carburant   = models.CharField(
+        _('Carburant'), max_length=20,
+        choices=CARBURANT_CHOICES, default='tous'
+    )
+
+    class Meta:
+        verbose_name = _('Compatibilité véhicule')
+        verbose_name_plural = _('Compatibilités véhicules')
+        ordering = ['marque', 'modele', 'annee_debut']
+        indexes = [
+            models.Index(fields=['produit', 'marque']),
+            models.Index(fields=['marque', 'modele']),
+        ]
+
+    def __str__(self):
+        parts = [self.marque]
+        if self.modele:
+            parts.append(self.modele)
+        if self.annee_debut or self.annee_fin:
+            parts.append(f"{self.annee_debut or '?'} – {self.annee_fin or 'présent'}")
+        if self.carburant and self.carburant != 'tous':
+            parts.append(self.get_carburant_display())
+        return ' / '.join(parts)
+
+    @property
+    def annees_display(self):
+        if self.annee_debut and self.annee_fin:
+            return f'{self.annee_debut} – {self.annee_fin}'
+        if self.annee_debut:
+            return f'{self.annee_debut}+'
+        if self.annee_fin:
+            return f"jusqu'à {self.annee_fin}"
+        return 'Toutes années'
+
+
 class ProduitPhoto(models.Model):
     """Photos additionnelles d'un produit (galerie multi-faces)."""
 
@@ -325,6 +408,7 @@ class MouvementStock(TenantMixin):
         indexes = [
             models.Index(fields=['entreprise', 'produit', '-date_mouvement']),
             models.Index(fields=['entreprise', 'type_mouvement', '-date_mouvement']),
+            models.Index(fields=['entreprise', 'reference_document']),
         ]
 
     def __str__(self):
@@ -357,5 +441,14 @@ class MouvementStock(TenantMixin):
                 self.quantite_apres = produit.quantite_stock
                 produit.save(update_fields=['quantite_stock', 'date_modification'])
                 super().save(*args, **kwargs)
+
+                # Mise à jour du prix d'achat (CUMP) après une entrée avec prix
+                if self.type_mouvement in (
+                    self.TypeMouvement.ENTREE,
+                    self.TypeMouvement.RETOUR_FOURNISSEUR,
+                ) and self.prix_unitaire:
+                    cump = produit.cout_moyen_pondere
+                    if cump and cump > 0:
+                        Produit.objects.filter(pk=produit.pk).update(prix_achat=cump)
         else:
             super().save(*args, **kwargs)

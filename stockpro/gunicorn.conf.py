@@ -1,4 +1,4 @@
-# gunicorn.conf.py — Configuration Gunicorn pour StockPro SN
+# gunicorn.conf.py — Configuration Gunicorn pour StockPro Automobile
 import multiprocessing
 
 # Adresse et port d'écoute

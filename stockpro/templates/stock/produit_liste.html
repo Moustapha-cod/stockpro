@@ -1,208 +1,474 @@
 {% extends 'base.html' %}
 {% load humanize %}
 
-{% block title %}Produits — StockPro SN{% endblock %}
+{% block title %}Produits — StockPro Automobile{% endblock %}
 {% block page_title %}Produits{% endblock %}
 
+{% block extra_css %}
+<style>
+.compat-tags { display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; }
+.compat-tag  { font-size:.65rem; background:#e8f4fd; color:#0d6efd; border:1px solid #b6d8f5; border-radius:3px; padding:1px 5px; white-space:nowrap; }
+.btn-cart    { transition: transform .1s; }
+.btn-cart:active { transform: scale(.9); }
+.panier-badge { font-size:.65rem; min-width:18px; height:18px; line-height:18px; padding:0 4px; }
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- Actions + Filtres -->
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <form class="d-flex gap-2 flex-wrap" method="get">
-        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Rechercher…" style="width:200px;">
+
+<!-- ══ FILTRES ═══════════════════════════════════════════════════════════ -->
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" id="form-filtres">
+
+      <!-- Ligne 1 : recherche générale -->
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+               placeholder="Nom, référence, OEM…" style="width:200px;">
+
         <select name="categorie" class="form-select form-select-sm" style="width:160px;">
-            <option value="">Toutes catégories</option>
-            {% for cat in categories %}
-            <option value="{{ cat.pk }}" {% if categorie_id == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.nom }}</option>
-            {% endfor %}
+          <option value="">Toutes catégories</option>
+          {% for cat in categories %}
+          <option value="{{ cat.pk }}" {% if categorie_id == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.nom }}</option>
+          {% endfor %}
         </select>
-        <select name="statut" class="form-select form-select-sm" style="width:140px;">
-            <option value="">Tous statuts</option>
-            <option value="alerte" {% if statut == 'alerte' %}selected{% endif %}>En alerte</option>
-            <option value="rupture" {% if statut == 'rupture' %}selected{% endif %}>En rupture</option>
-            <option value="actif" {% if statut == 'actif' %}selected{% endif %}>Actif</option>
+
+        <input type="text" name="marque" value="{{ marque }}" id="filtre-marque"
+               class="form-control form-control-sm" placeholder="Marque pièce…" style="width:150px;" autocomplete="off">
+
+        <select name="type_vehicule" class="form-select form-select-sm" style="width:110px;">
+          <option value="">PL &amp; VL</option>
+          {% for val, label in type_vehicule_choices %}
+          <option value="{{ val }}" {% if type_vehicule == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
         </select>
+
+        <select name="statut" class="form-select form-select-sm" style="width:130px;">
+          <option value="">Tous statuts</option>
+          <option value="alerte"   {% if statut == 'alerte'   %}selected{% endif %}>En alerte</option>
+          <option value="rupture"  {% if statut == 'rupture'  %}selected{% endif %}>En rupture</option>
+          <option value="actif"    {% if statut == 'actif'    %}selected{% endif %}>Actif</option>
+        </select>
+
         <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
-        {% if q or categorie_id or statut %}<a href="{% url 'stock:produit_liste' %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></a>{% endif %}
+        {% if q or categorie_id or statut or marque or compat_marque or compat_modele or compat_annee or type_vehicule %}
+        <a href="{% url 'stock:produit_liste' %}" class="btn btn-sm btn-outline-danger" title="Effacer les filtres"><i class="bi bi-x-lg"></i></a>
+        {% endif %}
+      </div>
+
+      <!-- Ligne 2 : compatibilité véhicule -->
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="text-muted small me-1"><i class="bi bi-truck me-1"></i>Compatibilité :</span>
+
+        <input type="text" name="compat_marque" value="{{ compat_marque }}" id="filtre-compat-marque"
+               class="form-control form-control-sm" placeholder="Marque véhicule…" style="width:160px;" autocomplete="off">
+
+        <input type="text" name="compat_modele" value="{{ compat_modele }}"
+               class="form-control form-control-sm" placeholder="Modèle…" style="width:140px;" autocomplete="off">
+
+        <input type="number" name="compat_annee" value="{{ compat_annee }}"
+               class="form-control form-control-sm" placeholder="Année…" style="width:100px;" min="1950" max="2050">
+
+        {% if compat_marque or compat_modele or compat_annee %}
+        <span class="badge bg-info text-dark">Filtre compat. actif</span>
+        {% endif %}
+      </div>
+
     </form>
-    <a href="{% url 'stock:produit_creer' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Nouveau produit</a>
+  </div>
 </div>
 
-<!-- Tableau -->
+<!-- ══ BARRE SUPÉRIEURE ═══════════════════════════════════════════════════ -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <span class="text-muted small"><i class="bi bi-box me-1 text-primary"></i>{{ total }} produit{{ total|pluralize }}</span>
+  <div class="d-flex gap-2">
+    <!-- Bouton panier (visible si panier non vide) -->
+    <button class="btn btn-sm btn-warning d-none" id="btn-ouvrir-panier"
+            data-bs-toggle="offcanvas" data-bs-target="#panierOffcanvas">
+      <i class="bi bi-cart3 me-1"></i>Panier
+      <span class="badge bg-danger ms-1 panier-badge" id="badge-nb">0</span>
+    </button>
+    <a href="{% url 'stock:produit_creer' %}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Nouveau produit
+    </a>
+  </div>
+</div>
+
+<!-- ══ TABLEAU PRODUITS ══════════════════════════════════════════════════ -->
 <div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <span class="fw-semibold small"><i class="bi bi-box me-2 text-primary"></i>{{ total }} produit{{ total|pluralize }}</span>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover table-sm mb-0 align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th style="width:48px"></th>
-                    <th>Référence</th>
-                    <th>Désignation</th>
-                    <th>Catégorie</th>
-                    <th>Fournisseur</th>
-                    <th class="text-end">Prix achat</th>
-                    <th class="text-end">Prix vente</th>
-                    <th class="text-center">Stock</th>
-                    <th class="text-center">Statut</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in produits %}
-                <tr>
-                    <td>
-                        {% with extra=p.photos.all %}
-                        {% if p.image or extra %}
-                        {% comment %}Construire la liste JSON de toutes les photos{% endcomment %}
-                        <div class="position-relative d-inline-block"
-                             style="cursor:zoom-in;"
-                             onclick="ouvrirGalerie(this)"
-                             data-nom="{{ p.nom }}"
-                             data-ref="{{ p.reference }}"
-                             data-photos="[{% if p.image %}&quot;{{ p.image.url }}&quot;{% endif %}{% for ph in extra %}{% if p.image or not forloop.first %},{% endif %}&quot;{{ ph.image.url }}&quot;{% endfor %}]">
-                            {% if p.image %}
-                            <img src="{{ p.image.url }}" alt="{{ p.nom }}"
-                                 style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6;">
-                            {% else %}
-                            <img src="{{ extra.0.image.url }}" alt="{{ p.nom }}"
-                                 style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6;">
-                            {% endif %}
-                            {% with total=extra|length %}
-                            {% if total %}
-                            <span class="position-absolute badge rounded-pill bg-primary"
-                                  style="font-size:.55rem;padding:.2em .4em;top:-4px;right:-6px;">+{{ total }}</span>
-                            {% endif %}
-                            {% endwith %}
-                        </div>
-                        {% else %}
-                        <div class="d-flex align-items-center justify-content-center bg-light rounded"
-                             style="width:40px;height:40px;border:1px solid #dee2e6;">
-                            <i class="bi bi-image text-muted" style="font-size:.85rem;"></i>
-                        </div>
-                        {% endif %}
-                        {% endwith %}
-                    </td>
-                    <td class="text-muted small">{{ p.reference }}</td>
-                    <td>
-                        <div class="fw-semibold">{{ p.nom }}</div>
-                        {% if p.marque %}<div class="text-muted small">{{ p.marque }}</div>{% endif %}
-                    </td>
-                    <td>
-                        {% if p.categorie %}
-                        <span class="badge rounded-pill" style="background:{{ p.categorie.couleur }}20;color:{{ p.categorie.couleur }};border:1px solid {{ p.categorie.couleur }}40;">
-                            {{ p.categorie.nom }}
-                        </span>
-                        {% else %}<span class="text-muted small">—</span>{% endif %}
-                    </td>
-                    <td class="small">{{ p.fournisseur.nom|default:"—" }}</td>
-                    <td class="text-end small">{{ p.prix_achat|floatformat:2|intcomma }}</td>
-                    <td class="text-end small fw-semibold">{{ p.prix_vente|floatformat:2|intcomma }}</td>
-                    <td class="text-center">
-                        <span class="fw-bold {% if p.en_rupture %}text-danger{% elif p.en_alerte %}text-warning{% else %}text-success{% endif %}">
-                            {{ p.quantite_stock }}
-                        </span>
-                        <span class="text-muted small"> / {{ p.seuil_alerte }}</span>
-                    </td>
-                    <td class="text-center">
-                        {% if not p.actif %}
-                        <span class="badge bg-secondary">Inactif</span>
-                        {% elif p.en_rupture %}
-                        <span class="badge bg-danger">Rupture</span>
-                        {% elif p.en_alerte %}
-                        <span class="badge bg-warning text-dark">Alerte</span>
-                        {% else %}
-                        <span class="badge bg-success">OK</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        <a href="{% url 'stock:produit_modifier' p.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2"><i class="bi bi-pencil"></i></a>
-                        <a href="{% url 'stock:produit_supprimer' p.pk %}" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i></a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="10" class="text-center text-muted py-4">Aucun produit trouvé</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:44px"></th>
+          <th>Référence / OEM</th>
+          <th>Désignation</th>
+          <th class="text-center">Type</th>
+          <th>Catégorie</th>
+          <th>Marque</th>
+          <th class="text-end">Prix achat</th>
+          <th class="text-end">Prix vente</th>
+          <th class="text-center">Stock</th>
+          <th class="text-center">Statut</th>
+          <th class="text-center" style="width:110px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in produits %}
+        <tr>
+          <!-- Photo -->
+          <td>
+            {% with extra=p.photos.all %}
+            {% if p.image or extra %}
+            <div class="position-relative d-inline-block" style="cursor:zoom-in;" onclick="ouvrirGalerie(this)"
+                 data-nom="{{ p.nom }}" data-ref="{{ p.reference }}"
+                 data-photos="[{% if p.image %}&quot;{{ p.image.url }}&quot;{% endif %}{% for ph in extra %}{% if p.image or not forloop.first %},{% endif %}&quot;{{ ph.image.url }}&quot;{% endfor %}]">
+              {% if p.image %}
+              <img src="{{ p.image.url }}" alt="{{ p.nom }}" style="width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid #dee2e6;">
+              {% else %}
+              <img src="{{ extra.0.image.url }}" alt="{{ p.nom }}" style="width:38px;height:38px;object-fit:cover;border-radius:5px;border:1px solid #dee2e6;">
+              {% endif %}
+              {% with total=extra|length %}{% if total %}
+              <span class="position-absolute badge rounded-pill bg-primary" style="font-size:.5rem;padding:.2em .4em;top:-4px;right:-6px;">+{{ total }}</span>
+              {% endif %}{% endwith %}
+            </div>
+            {% else %}
+            <div class="d-flex align-items-center justify-content-center bg-light rounded" style="width:38px;height:38px;border:1px solid #dee2e6;">
+              <i class="bi bi-image text-muted" style="font-size:.8rem;"></i>
+            </div>
+            {% endif %}
+            {% endwith %}
+          </td>
+
+          <!-- Référence / OEM -->
+          <td class="small">
+            <div class="text-muted">{{ p.reference }}</div>
+            {% if p.reference_oem %}<div class="text-primary" style="font-size:.7rem;"><i class="bi bi-upc me-1"></i>{{ p.reference_oem }}</div>{% endif %}
+          </td>
+
+          <!-- Désignation + marque + compat -->
+          <td>
+            <div class="fw-semibold">{{ p.nom }}</div>
+            {% with compats=p.compatibilites.all %}
+            {% if compats %}
+            <div class="compat-tags">
+              {% for c in compats|slice:":4" %}
+              <span class="compat-tag" title="{% if c.annee_debut %}{{ c.annee_debut }}{% endif %}{% if c.annee_fin %}–{{ c.annee_fin }}{% endif %}">
+                <i class="bi bi-truck" style="font-size:.6rem;"></i> {{ c.marque }}{% if c.modele %} {{ c.modele }}{% endif %}
+              </span>
+              {% endfor %}
+              {% if compats|length > 4 %}<span class="compat-tag">+{{ compats|length|add:"-4" }}</span>{% endif %}
+            </div>
+            {% endif %}
+            {% endwith %}
+          </td>
+
+          <!-- Type -->
+          <td class="text-center">
+            {% if p.type_vehicule == 'PL' %}<span class="badge bg-dark" title="Poids Lourd">PL</span>
+            {% elif p.type_vehicule == 'VL' %}<span class="badge bg-info text-dark" title="Véhicule Léger">VL</span>
+            {% else %}<span class="badge bg-secondary" title="PL &amp; VL">PL+VL</span>
+            {% endif %}
+          </td>
+
+          <!-- Catégorie -->
+          <td>
+            {% if p.categorie %}
+            <span class="badge rounded-pill" style="background:{{ p.categorie.couleur }}20;color:{{ p.categorie.couleur }};border:1px solid {{ p.categorie.couleur }}40;">{{ p.categorie.nom }}</span>
+            {% else %}<span class="text-muted small">—</span>{% endif %}
+          </td>
+
+          <!-- Marque -->
+          <td class="small">{{ p.marque|default:"—" }}</td>
+
+          <!-- Prix -->
+          <td class="text-end small">{{ p.prix_achat|floatformat:0|intcomma }}</td>
+          <td class="text-end small fw-semibold">{{ p.prix_vente|floatformat:0|intcomma }}</td>
+
+          <!-- Stock -->
+          <td class="text-center">
+            <span class="fw-bold {% if p.en_rupture %}text-danger{% elif p.en_alerte %}text-warning{% else %}text-success{% endif %}">{{ p.quantite_stock }}</span>
+            <span class="text-muted small"> / {{ p.seuil_alerte }}</span>
+          </td>
+
+          <!-- Statut -->
+          <td class="text-center">
+            {% if not p.actif %}<span class="badge bg-secondary">Inactif</span>
+            {% elif p.en_rupture %}<span class="badge bg-danger">Rupture</span>
+            {% elif p.en_alerte %}<span class="badge bg-warning text-dark">Alerte</span>
+            {% else %}<span class="badge bg-success">OK</span>
+            {% endif %}
+          </td>
+
+          <!-- Actions -->
+          <td class="text-end">
+            <button class="btn btn-sm btn-success btn-cart py-0 px-2 me-1"
+                    onclick="ajouterAuPanier(this)"
+                    data-url="{% url 'stock:panier_ajouter' p.pk %}"
+                    data-nom="{{ p.nom|escapejs }}"
+                    title="Ajouter au panier"
+                    {% if p.en_rupture or not p.actif %}disabled{% endif %}>
+              <i class="bi bi-cart-plus"></i>
+            </button>
+            <a href="{% url 'stock:produit_modifier' p.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2"><i class="bi bi-pencil"></i></a>
+            <a href="{% url 'stock:produit_supprimer' p.pk %}" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="11" class="text-center text-muted py-4">Aucun produit trouvé</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<!-- Modal galerie -->
-<div class="modal fade" id="modalGalerie" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header py-2 border-0 px-3">
-                <div>
-                    <div class="fw-semibold" id="modalNom"></div>
-                    <div class="text-muted small" id="modalRef"></div>
-                </div>
-                <span class="badge bg-secondary ms-2" id="modalCount" style="font-size:.75rem;"></span>
-                <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0 bg-dark text-center position-relative" style="min-height:280px;">
-                <img id="modalImg" src="" alt=""
-                     style="max-width:100%;max-height:72vh;object-fit:contain;">
-                <button id="btnPrev" onclick="nav(-1)"
-                        class="btn btn-light position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
-                        style="width:36px;height:36px;opacity:.85;">
-                    <i class="bi bi-chevron-left"></i>
-                </button>
-                <button id="btnNext" onclick="nav(1)"
-                        class="btn btn-light position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
-                        style="width:36px;height:36px;opacity:.85;">
-                    <i class="bi bi-chevron-right"></i>
-                </button>
-            </div>
-            <!-- Bande vignettes -->
-            <div id="modalThumbs" class="d-flex gap-2 p-2 bg-dark overflow-auto" style="border-radius:0 0 .375rem .375rem;"></div>
-        </div>
+<!-- ══ OFFCANVAS PANIER ══════════════════════════════════════════════════ -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="panierOffcanvas" style="width:380px;">
+  <div class="offcanvas-header border-bottom">
+    <h6 class="offcanvas-title fw-bold"><i class="bi bi-cart3 me-2 text-warning"></i>Panier</h6>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body p-0 d-flex flex-column" style="overflow:hidden;">
+
+    <!-- Liste des articles -->
+    <div id="panier-liste" class="flex-grow-1 overflow-auto p-3">
+      <p class="text-muted text-center py-4" id="panier-vide-msg">Le panier est vide.</p>
     </div>
+
+    <!-- Pied panier -->
+    <div class="border-top p-3 bg-light" id="panier-footer" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="fw-semibold">Total estimé</span>
+        <span class="fw-bold fs-5 text-success" id="panier-total">0 FCFA</span>
+      </div>
+      <div class="d-grid gap-2">
+        <a href="{% url 'facturation:facture_creer' %}?from_panier=1"
+           class="btn btn-primary" id="btn-creer-facture">
+          <i class="bi bi-file-earmark-plus me-1"></i>Créer la facture
+        </a>
+        <button class="btn btn-outline-danger btn-sm" onclick="viderPanier()">
+          <i class="bi bi-trash me-1"></i>Vider le panier
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- Bouton flottant panier (mobile / alternative) -->
+<div class="position-fixed" style="bottom:1.5rem;right:1.5rem;z-index:1040;">
+  <button class="btn btn-warning rounded-circle shadow d-none" id="btn-flottant-panier"
+          style="width:52px;height:52px;font-size:1.2rem;"
+          data-bs-toggle="offcanvas" data-bs-target="#panierOffcanvas" title="Voir le panier">
+    <i class="bi bi-cart3"></i>
+    <span class="position-absolute badge rounded-pill bg-danger panier-badge"
+          style="top:4px;right:4px;" id="badge-nb-flottant">0</span>
+  </button>
+</div>
+
+<!-- ══ MODAL GALERIE ════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalGalerie" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header py-2 border-0 px-3">
+        <div>
+          <div class="fw-semibold" id="modalNom"></div>
+          <div class="text-muted small" id="modalRef"></div>
+        </div>
+        <span class="badge bg-secondary ms-2" id="modalCount" style="font-size:.75rem;"></span>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0 bg-dark text-center position-relative" style="min-height:280px;">
+        <img id="modalImg" src="" alt="" style="max-width:100%;max-height:72vh;object-fit:contain;">
+        <button id="btnPrev" onclick="nav(-1)"
+                class="btn btn-light position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width:36px;height:36px;opacity:.85;"><i class="bi bi-chevron-left"></i></button>
+        <button id="btnNext" onclick="nav(1)"
+                class="btn btn-light position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width:36px;height:36px;opacity:.85;"><i class="bi bi-chevron-right"></i></button>
+      </div>
+      <div id="modalThumbs" class="d-flex gap-2 p-2 bg-dark overflow-auto" style="border-radius:0 0 .375rem .375rem;"></div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// ── Données autocomplete ────────────────────────────────────────────────
+const MARQUES_PIECES  = {{ marques_pieces_json|safe }};
+const COMPAT_MARQUES  = {{ compat_marques_json|safe }};
+
+// ── CSRF token (CSRF_COOKIE_HTTPONLY=True → on lit depuis le template) ──
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+// ── Galerie photos ──────────────────────────────────────────────────────
 let _photos = [], _idx = 0;
 const modal = () => bootstrap.Modal.getOrCreateInstance(document.getElementById('modalGalerie'));
 
 function ouvrirGalerie(el) {
-    _photos = JSON.parse(el.dataset.photos);
-    _idx = 0;
-    document.getElementById('modalNom').textContent = el.dataset.nom;
-    document.getElementById('modalRef').textContent  = 'Réf. ' + el.dataset.ref;
-    afficher();
-    modal().show();
+  _photos = JSON.parse(el.dataset.photos);
+  _idx = 0;
+  document.getElementById('modalNom').textContent = el.dataset.nom;
+  document.getElementById('modalRef').textContent  = 'Réf. ' + el.dataset.ref;
+  afficher();
+  modal().show();
 }
 
 function afficher() {
-    document.getElementById('modalImg').src = _photos[_idx];
-    document.getElementById('modalCount').textContent = _photos.length > 1 ? `${_idx + 1} / ${_photos.length}` : '';
-    document.getElementById('btnPrev').style.display = _idx > 0 ? '' : 'none';
-    document.getElementById('btnNext').style.display = _idx < _photos.length - 1 ? '' : 'none';
-
-    // Vignettes
-    const wrap = document.getElementById('modalThumbs');
-    wrap.style.display = _photos.length > 1 ? 'flex' : 'none';
-    wrap.innerHTML = '';
-    _photos.forEach((src, i) => {
-        const img = document.createElement('img');
-        img.src = src;
-        img.style.cssText = `width:54px;height:54px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid ${i===_idx?'#0d6efd':'transparent'};flex-shrink:0;`;
-        img.onclick = () => { _idx = i; afficher(); };
-        wrap.appendChild(img);
-    });
+  document.getElementById('modalImg').src = _photos[_idx];
+  document.getElementById('modalCount').textContent = _photos.length > 1 ? `${_idx+1} / ${_photos.length}` : '';
+  document.getElementById('btnPrev').style.display = _idx > 0 ? '' : 'none';
+  document.getElementById('btnNext').style.display = _idx < _photos.length-1 ? '' : 'none';
+  const wrap = document.getElementById('modalThumbs');
+  wrap.style.display = _photos.length > 1 ? 'flex' : 'none';
+  wrap.innerHTML = '';
+  _photos.forEach((src, i) => {
+    const img = document.createElement('img');
+    img.src = src;
+    img.style.cssText = `width:54px;height:54px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid ${i===_idx?'#0d6efd':'transparent'};flex-shrink:0;`;
+    img.onclick = () => { _idx = i; afficher(); };
+    wrap.appendChild(img);
+  });
 }
 
 function nav(dir) {
-    _idx = Math.max(0, Math.min(_photos.length - 1, _idx + dir));
-    afficher();
+  _idx = Math.max(0, Math.min(_photos.length-1, _idx+dir));
+  afficher();
 }
 
 document.addEventListener('keydown', e => {
-    if (!document.getElementById('modalGalerie').classList.contains('show')) return;
-    if (e.key === 'ArrowLeft')  nav(-1);
-    if (e.key === 'ArrowRight') nav(1);
+  if (!document.getElementById('modalGalerie').classList.contains('show')) return;
+  if (e.key === 'ArrowLeft')  nav(-1);
+  if (e.key === 'ArrowRight') nav(1);
 });
+
+// ── Panier ──────────────────────────────────────────────────────────────
+const URL_RETIRER  = "{% url 'stock:panier_retirer' pk=0 %}".replace('/0/', '/');
+const URL_QUANTITE = "{% url 'stock:panier_maj_quantite' pk=0 %}".replace('/0/', '/');
+const URL_VIDER    = "{% url 'stock:panier_vider' %}";
+
+let panier = {{ panier_json|safe }};  // JSON injecté par la vue via json.dumps()
+
+function renderPanier() {
+  const liste   = document.getElementById('panier-liste');
+  const footer  = document.getElementById('panier-footer');
+  const nb      = panier.reduce((s, i) => s + i.quantite, 0);
+  const total   = panier.reduce((s, i) => s + i.prix_vente * i.quantite, 0);
+
+  document.querySelectorAll('#badge-nb, #badge-nb-flottant').forEach(el => el.textContent = nb);
+  const btnOuvrir   = document.getElementById('btn-ouvrir-panier');
+  const btnFlottant = document.getElementById('btn-flottant-panier');
+  if (nb > 0) {
+    btnOuvrir.classList.remove('d-none');
+    btnFlottant.classList.remove('d-none');
+  } else {
+    btnOuvrir.classList.add('d-none');
+    btnFlottant.classList.add('d-none');
+  }
+
+  if (panier.length === 0) {
+    footer.style.display = 'none';
+    liste.innerHTML = '<p class="text-muted text-center py-4">Le panier est vide.</p>';
+    return;
+  }
+
+  footer.style.display = '';
+  document.getElementById('panier-total').textContent =
+    new Intl.NumberFormat('fr-FR').format(Math.round(total)) + ' FCFA';
+
+  liste.innerHTML = panier.map(item => `
+    <div class="d-flex align-items-start gap-2 mb-3 pb-3 border-bottom">
+      <div class="flex-grow-1">
+        <div class="fw-semibold small">${item.nom}</div>
+        ${item.reference ? `<div class="text-muted" style="font-size:.72rem;">${item.reference}</div>` : ''}
+        <div class="text-success small">${new Intl.NumberFormat('fr-FR').format(item.prix_vente)} FCFA / u</div>
+      </div>
+      <div class="d-flex align-items-center gap-1">
+        <button class="btn btn-outline-secondary btn-sm py-0 px-1"
+                onclick="majQuantite(${item.pk}, ${item.quantite - 1})">−</button>
+        <input type="number" class="form-control form-control-sm text-center py-0 px-1"
+               style="width:44px;" value="${item.quantite}" min="1"
+               onchange="majQuantite(${item.pk}, +this.value)">
+        <button class="btn btn-outline-secondary btn-sm py-0 px-1"
+                onclick="majQuantite(${item.pk}, ${item.quantite + 1})">+</button>
+        <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1"
+                onclick="retirerDuPanier(${item.pk})" title="Retirer"><i class="bi bi-x"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function ajouterAuPanier(btn) {
+  const url = btn.dataset.url;
+  fetch(url, {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'},
+  })
+  .then(r => r.json())
+  .then(data => {
+    panier = data.panier;
+    renderPanier();
+    btn.classList.add('btn-dark');
+    setTimeout(() => btn.classList.remove('btn-dark'), 500);
+    if (data.nb === 1) {
+      bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('panierOffcanvas')).show();
+    }
+  })
+  .catch(err => console.error('Panier erreur:', err));
+}
+
+function retirerDuPanier(pk) {
+  fetch(URL_RETIRER + pk + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'},
+  })
+  .then(r => r.json())
+  .then(data => { panier = data.panier; renderPanier(); });
+}
+
+function majQuantite(pk, quantite) {
+  if (quantite < 1) { retirerDuPanier(pk); return; }
+  fetch(URL_QUANTITE + pk + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF_TOKEN, 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+    body: JSON.stringify({quantite}),
+  })
+  .then(r => r.json())
+  .then(data => { panier = data.panier; renderPanier(); });
+}
+
+function viderPanier() {
+  fetch(URL_VIDER, {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'},
+  })
+  .then(r => r.json())
+  .then(data => { panier = data.panier; renderPanier(); });
+}
+
+renderPanier();
+
+// ── Autocomplete marque pièce ───────────────────────────────────────────
+(function() {
+  const inp = document.getElementById('filtre-marque');
+  if (!inp || !MARQUES_PIECES.length) return;
+  new TomSelect(inp, {
+    options: MARQUES_PIECES.map(m => ({value: m, text: m})),
+    create: true, createOnBlur: true, maxItems: 1,
+    placeholder: 'Marque pièce…',
+  });
+})();
+
+// ── Autocomplete marque véhicule compat ────────────────────────────────
+(function() {
+  const inp = document.getElementById('filtre-compat-marque');
+  if (!inp || !COMPAT_MARQUES.length) return;
+  new TomSelect(inp, {
+    options: COMPAT_MARQUES.map(m => ({value: m, text: m})),
+    create: true, createOnBlur: true, maxItems: 1,
+    placeholder: 'Marque véhicule…',
+  });
+})();
 </script>
 {% endblock %}

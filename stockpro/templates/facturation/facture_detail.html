@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load humanize l10n %}
 
-{% block title %}{{ facture.numero }} — StockPro SN{% endblock %}
+{% block title %}{{ facture.numero }} — StockPro Automobile{% endblock %}
 {% block page_title %}{{ facture.numero }}{% endblock %}
 
 {% block extra_css %}
@@ -62,7 +62,8 @@
                             {{ facture.get_statut_display }}
                         </span>
                         <div class="mt-2 d-flex gap-1 justify-content-end flex-wrap">
-                            <a href="{% url 'facturation:facture_imprimer' facture.pk %}" class="btn btn-sm btn-outline-primary" title="Imprimer / PDF" target="_blank"><i class="bi bi-printer me-1"></i>Imprimer</a>
+                            <a href="{% url 'facturation:facture_imprimer' facture.pk %}" class="btn btn-sm btn-outline-primary" title="Imprimer" target="_blank"><i class="bi bi-printer me-1"></i>Imprimer</a>
+                            <a href="{% url 'facturation:facture_telecharger_pdf' facture.pk %}" class="btn btn-sm btn-success" title="Télécharger PDF"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
                             {% if facture.statut != 'annulee' %}
                             <a href="{% url 'facturation:facture_modifier' facture.pk %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
                             <a href="{% url 'facturation:facture_annuler' facture.pk %}" class="btn btn-sm btn-outline-danger" title="Annuler"><i class="bi bi-x-circle"></i></a>

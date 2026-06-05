@@ -1,5 +1,5 @@
 """
-StockPro SN — Configuration principale Django
+StockPro Automobile — Configuration principale Django
 Application de gestion de stock multi-entreprises
 """
 
@@ -105,6 +105,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.tenants.context_processors.current_tenant',  # Injecte l'entreprise courante
                 'apps.stock.context_processors.alertes_stock',    # Injecte les compteurs d'alertes stock
+                'apps.common.context_processors.csp_nonce',       # Nonce CSP par requête
             ],
         },
     },
@@ -201,13 +202,16 @@ CURRENCY = 'FCFA'
 CURRENCY_SYMBOL = 'F'
 
 # ─── Email ────────────────────────────────────────────────────────────────────
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_BACKEND  = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST     = config('EMAIL_HOST',    default='')
+EMAIL_PORT     = config('EMAIL_PORT',    default=587, cast=int)
+EMAIL_HOST_USER     = config('EMAIL_HOST_USER',     default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@stockpro.sn')
+# TLS (port 587) et SSL (port 465) sont mutuellement exclusifs
+EMAIL_USE_TLS  = config('EMAIL_USE_TLS', default=True,  cast=bool)
+EMAIL_USE_SSL  = config('EMAIL_USE_SSL', default=False, cast=bool)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='StockPro Automobile <noreply@stockpro.sn>')
+SERVER_EMAIL       = DEFAULT_FROM_EMAIL   # expéditeur des erreurs Django (admins)
 
 # ─── Clé primaire par défaut ──────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -285,11 +289,11 @@ AXES_ENABLE_ADMIN         = False      # Pas d'interface axes dans l'admin
 
 # ─── Jazzmin — Admin UI ───────────────────────────────────────────────────────
 JAZZMIN_SETTINGS = {
-    "site_title":    "StockPro SN",
-    "site_header":   "StockPro SN",
-    "site_brand":    "StockPro SN",
-    "welcome_sign":  "Bienvenue dans l'administration StockPro SN",
-    "copyright":     "StockPro SN — Gestion de stock automobile",
+    "site_title":    "StockPro Automobile",
+    "site_header":   "StockPro Automobile",
+    "site_brand":    "StockPro Automobile",
+    "welcome_sign":  "Bienvenue dans l'administration StockPro Automobile",
+    "copyright":     "StockPro Automobile — Gestion de stock automobile",
 
     "site_icon":  None,
     "site_logo":  None,

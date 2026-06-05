@@ -1,4 +1,4 @@
-# StockPro SN — Application de Gestion de Stock
+# StockPro Automobile — Application de Gestion de Stock
 
 Application web Django multi-entreprises pour la gestion de stock et la facturation, adaptée au contexte sénégalais.
 

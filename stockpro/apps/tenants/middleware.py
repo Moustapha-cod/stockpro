@@ -5,6 +5,7 @@ Middleware d'isolation — injecte l'entreprise courante dans chaque requête
 
 from django.shortcuts import redirect
 from django.contrib import messages
+from django.contrib.auth import logout
 from django.urls import reverse
 
 
@@ -44,6 +45,15 @@ class TenantMiddleware:
                     messages.warning(request, 'Accès réservé aux utilisateurs d\'une entreprise.')
                     return redirect('tenants:platform')
             elif hasattr(request.user, 'profil') and request.user.profil.entreprise:
+                # Vérification profil.actif à chaque requête (#12) : invalide les sessions
+                # des comptes désactivés même s'ils étaient déjà connectés.
+                if not request.user.profil.actif:
+                    logout(request)
+                    messages.warning(
+                        request,
+                        'Votre compte a été désactivé. Contactez votre administrateur.'
+                    )
+                    return redirect(reverse('accounts:login'))
                 request.entreprise = request.user.profil.entreprise
             else:
                 # Utilisateur sans entreprise → redirection

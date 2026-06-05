@@ -41,17 +41,24 @@ class Client(TenantMixin):
         verbose_name = _('Client')
         verbose_name_plural = _('Clients')
         ordering = ['nom']
+        indexes = [
+            models.Index(fields=['entreprise', 'nom']),
+            models.Index(fields=['entreprise', 'actif']),
+        ]
 
     def __str__(self):
         return self.nom
 
     @property
     def solde_du(self):
-        """Total des créances impayées sur ce client"""
-        factures = self.factures.filter(
+        """Total des créances impayées sur ce client (1 seule requête SQL)"""
+        from django.db.models import Sum
+        result = self.factures.filter(
             statut__in=[Facture.Statut.EMISE, Facture.Statut.PARTIELLEMENT_PAYEE]
-        )
-        return sum(f.montant_restant for f in factures)
+        ).aggregate(total_ttc=Sum('montant_ttc'), total_paye=Sum('montant_paye'))
+        ttc = result['total_ttc'] or 0
+        paye = result['total_paye'] or 0
+        return max(ttc - paye, 0)
 
     @property
     def nombre_factures(self):
@@ -231,23 +238,24 @@ class Facture(TenantMixin):
             self.save(update_fields=['statut', 'date_modification'])
 
     def generer_numero(self):
-        """Génère le prochain numéro de facture (FAC-YYYY-XXXX) de façon atomique."""
+        """Génère le prochain numéro de facture (FAC-YYYY-XXXX).
+        Doit être appelé depuis un bloc transaction.atomic() déjà ouvert
+        afin que le verrou select_for_update soit maintenu jusqu'au save().
+        """
         from django.utils import timezone
-        from django.db import transaction
         annee = timezone.now().year
-        with transaction.atomic():
-            derniere = Facture.objects.select_for_update().filter(
-                entreprise=self.entreprise,
-                numero__startswith=f'FAC-{annee}-'
-            ).order_by('-id').first()
+        derniere = Facture.objects.select_for_update().filter(
+            entreprise=self.entreprise,
+            numero__startswith=f'FAC-{annee}-'
+        ).order_by('-id').first()
 
-            if derniere:
-                try:
-                    seq = int(derniere.numero.split('-')[-1]) + 1
-                except (ValueError, IndexError):
-                    seq = 1
-            else:
+        if derniere:
+            try:
+                seq = int(derniere.numero.split('-')[-1]) + 1
+            except (ValueError, IndexError):
                 seq = 1
+        else:
+            seq = 1
 
         return f'FAC-{annee}-{seq:04d}'
 

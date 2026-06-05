@@ -167,5 +167,5 @@ def _corps_texte(ctx):
                 f"  - {p.nom} : {p.quantite_stock} unité(s) "
                 f"(seuil : {p.seuil_alerte})"
             )
-    lignes += ["", "— StockPro SN"]
+    lignes += ["", "— StockPro Automobile"]
     return "\n".join(lignes)

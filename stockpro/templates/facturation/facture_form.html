@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ titre }} — StockPro SN{% endblock %}
+{% block title %}{{ titre }} — StockPro Automobile{% endblock %}
 {% block page_title %}{{ titre }}{% endblock %}
 
 {% block extra_css %}
@@ -416,5 +416,32 @@ function initTomSelectProduit(selectEl) {
 document.querySelectorAll('.ligne-produit').forEach(function(el) {
     initTomSelectProduit(el);
 });
+
+{% if depuis_panier %}
+// Préremplissage depuis le panier : injecter les options dans chaque Tom Select
+(function() {
+    var rows = document.querySelectorAll('#lignes-body .formset-row');
+    var panierData = {{ panier_json|default:"[]" }};
+    rows.forEach(function(row, idx) {
+        var item = panierData[idx];
+        if (!item) return;
+        var sel = row.querySelector('.ligne-produit');
+        if (!sel || !sel.tomselect) return;
+        var ts = sel.tomselect;
+        // Ajouter l'option et la sélectionner
+        ts.addOption({value: String(item.pk), text: item.nom});
+        ts.setValue(String(item.pk), true);
+        // Remplir désignation et prix
+        var desig = row.querySelector('[name$="-designation"]');
+        var prix  = row.querySelector('[name$="-prix_unitaire_ht"]');
+        var qte   = row.querySelector('[name$="-quantite"]');
+        if (desig && !desig.value) desig.value = item.nom;
+        if (prix  && !prix.value)  prix.value  = Math.round(item.prix_vente);
+        if (qte)                   qte.value   = item.quantite;
+    });
+    // Déclencher le recalcul
+    document.getElementById('lignes-body')?.dispatchEvent(new Event('input', {bubbles: true}));
+})();
+{% endif %}
 </script>
 {% endblock %}

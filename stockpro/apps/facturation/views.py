@@ -5,7 +5,11 @@ from django.contrib import messages
 from django.db.models import Q, Sum, Count, F
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.db import transaction
 
+import io
 import json
 import logging
 from .models import Client, Facture, Paiement
@@ -90,16 +94,19 @@ def facture_liste(request):
 def facture_detail(request, pk):
     entreprise = request.entreprise
     facture = get_object_or_404(Facture, pk=pk, entreprise=entreprise)
-    # Exclure les lignes totalement retournées
+    # Quantités retournées par produit — 1 seule requête SQL (#5)
+    retours_map = {
+        r['produit_id']: r['total']
+        for r in MouvementStock.objects.filter(
+            entreprise=entreprise,
+            type_mouvement=MouvementStock.TypeMouvement.RETOUR_CLIENT,
+            reference_document=facture.numero,
+        ).values('produit_id').annotate(total=models.Sum('quantite'))
+    }
     lignes_all = facture.lignes.select_related('produit').all()
     lignes = []
     for ligne in lignes_all:
-        deja_retournee = MouvementStock.objects.filter(
-            entreprise=entreprise,
-            type_mouvement=MouvementStock.TypeMouvement.RETOUR_CLIENT,
-            produit=ligne.produit,
-            reference_document=facture.numero
-        ).aggregate(total=models.Sum('quantite'))['total'] or 0
+        deja_retournee = retours_map.get(ligne.produit_id, 0)
         quantite_restante = ligne.quantite - deja_retournee
         ligne.quantite_retournee = deja_retournee
         ligne.quantite_restante = quantite_restante
@@ -200,43 +207,81 @@ def facture_creer(request):
         form = FactureForm(request.POST, entreprise=entreprise)
         formset = LigneFactureFormSet(request.POST, form_kwargs={'entreprise': entreprise})
         if form.is_valid() and formset.is_valid():
-            facture = form.save(commit=False)
-            facture.entreprise = entreprise
-            facture.cree_par = request.user
-            facture.numero = facture.generer_numero()
-            facture.save()
-            formset.instance = facture
-            formset.save()
-            facture.recalculer_totaux()
-            if facture.statut == Facture.Statut.BROUILLON:
-                facture.statut = Facture.Statut.EMISE
-                facture.save(update_fields=['statut'])
-            # Déduire le stock pour chaque ligne de facture
-            for ligne in facture.lignes.select_related('produit'):
-                MouvementStock.objects.create(
-                    entreprise=entreprise,
-                    produit=ligne.produit,
-                    type_mouvement=MouvementStock.TypeMouvement.SORTIE,
-                    quantite=ligne.quantite,
-                    prix_unitaire=ligne.prix_unitaire_ht,
-                    reference_document=facture.numero,
-                    motif=f'Vente — Facture {facture.numero}',
-                    cree_par=request.user,
-                )
-            messages.success(request, f'Facture {facture.numero} créée.')
-            return redirect('facturation:facture_detail', pk=facture.pk)
+            # Vérification stock avant toute écriture (#2)
+            stock_errors = []
+            for f in formset:
+                cd = f.cleaned_data if hasattr(f, 'cleaned_data') else {}
+                if cd and not cd.get('DELETE'):
+                    produit = cd.get('produit')
+                    quantite = cd.get('quantite') or 0
+                    if produit and produit.quantite_stock < quantite:
+                        stock_errors.append(
+                            f'« {produit.nom} » : stock disponible {produit.quantite_stock} unité(s), demandé {quantite}.'
+                        )
+            if stock_errors:
+                for err in stock_errors:
+                    messages.error(request, err)
+            else:
+                # Création atomique : génération numéro + sauvegarde dans la même transaction (#1)
+                with transaction.atomic():
+                    facture = form.save(commit=False)
+                    facture.entreprise = entreprise
+                    facture.cree_par = request.user
+                    facture.numero = facture.generer_numero()
+                    facture.save()
+                    formset.instance = facture
+                    formset.save()
+                    facture.recalculer_totaux()
+                    if facture.statut == Facture.Statut.BROUILLON:
+                        facture.statut = Facture.Statut.EMISE
+                        facture.save(update_fields=['statut'])
+                    # Déduire le stock pour chaque ligne de facture
+                    for ligne in facture.lignes.select_related('produit'):
+                        MouvementStock.objects.create(
+                            entreprise=entreprise,
+                            produit=ligne.produit,
+                            type_mouvement=MouvementStock.TypeMouvement.SORTIE,
+                            quantite=ligne.quantite,
+                            prix_unitaire=ligne.prix_unitaire_ht,
+                            reference_document=facture.numero,
+                            motif=f'Vente — Facture {facture.numero}',
+                            cree_par=request.user,
+                        )
+                # Vider le panier après création de la facture
+                request.session['panier'] = []
+                request.session.modified = True
+                messages.success(request, f'Facture {facture.numero} créée.')
+                return redirect('facturation:facture_detail', pk=facture.pk)
     else:
         form = FactureForm(entreprise=entreprise)
-        formset = LigneFactureFormSet(form_kwargs={'entreprise': entreprise})
+        # Préremplir les lignes depuis le panier session si présent
+        panier = request.session.get('panier', [])
+        initial_lignes = [
+            {
+                'produit': item['pk'],
+                'designation': item['nom'],
+                'quantite': item['quantite'],
+                'prix_unitaire_ht': item['prix_vente'],
+            }
+            for item in panier
+        ]
+        formset = LigneFactureFormSet(
+            initial=initial_lignes if initial_lignes else None,
+            form_kwargs={'entreprise': entreprise},
+        )
 
     produits = Produit.objects.filter(entreprise=entreprise, actif=True).values('id', 'nom', 'prix_vente')
     produits_data = {str(p['id']): {'nom': p['nom'], 'prix': str(p['prix_vente'])} for p in produits}
 
+    panier_session = request.session.get('panier', [])
+    import json as _json
     return render(request, 'facturation/facture_form.html', {
         'form': form,
         'formset': formset,
         'titre': 'Nouvelle facture',
         'produits_data': produits_data,
+        'depuis_panier': bool(panier_session),
+        'panier_json': _json.dumps(panier_session),
     })
 
 
@@ -398,6 +443,42 @@ def facture_imprimer(request, pk):
         'paiements': paiements,
         'entreprise': entreprise,
     })
+
+
+def _pdf_link_callback(uri, rel):
+    """Resolve media/static URLs to absolute file paths for xhtml2pdf."""
+    from django.conf import settings
+    import os
+    if uri.startswith(settings.MEDIA_URL):
+        path = os.path.join(settings.MEDIA_ROOT, uri[len(settings.MEDIA_URL):])
+        return path
+    if uri.startswith(settings.STATIC_URL):
+        path = os.path.join(settings.STATIC_ROOT, uri[len(settings.STATIC_URL):])
+        return path
+    return uri
+
+
+@login_required
+def facture_telecharger_pdf(request, pk):
+    from xhtml2pdf import pisa
+    entreprise = request.entreprise
+    facture = get_object_or_404(Facture, pk=pk, entreprise=entreprise)
+    lignes = facture.lignes.select_related('produit').all()
+    paiements = facture.paiements.order_by('date_paiement')
+    html = render_to_string('facturation/facture_pdf.html', {
+        'facture': facture,
+        'lignes': lignes,
+        'paiements': paiements,
+        'entreprise': entreprise,
+    }, request=request)
+    buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(html, dest=buffer, link_callback=_pdf_link_callback)
+    if pisa_status.err:
+        return HttpResponse('Erreur lors de la génération du PDF.', status=500)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="facture_{facture.numero}.pdf"'
+    return response
 
 
 @login_required

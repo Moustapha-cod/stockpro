@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ titre }} — StockPro SN{% endblock %}
+{% block title %}{{ titre }} — StockPro Automobile{% endblock %}
 {% block page_title %}{{ titre }}{% endblock %}
 
 {% block content %}
@@ -33,17 +33,93 @@
                             {{ form.fournisseur }}
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Marque</label>
+                            <label class="form-label">Marque pièce</label>
                             {{ form.marque }}
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Modèle(s) compatible(s)</label>
-                            {{ form.modele_compatible }}
+                            <label class="form-label">Type de véhicule</label>
+                            {{ form.type_vehicule }}
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Code barre</label>
-                            {{ form.code_barre }}
+                            <label class="form-label">Référence OEM</label>
+                            {{ form.reference_oem }}
+                            <div class="form-text">Réf. constructeur officielle</div>
                         </div>
+                        <div class="col-12">
+                            <label class="form-label">Réf. équivalente / cross-ref</label>
+                            {{ form.reference_equivalente }}
+                            <div class="form-text">Ex: ATE 24.0120, LPR BK1030, TRW DF4778</div>
+                        </div>
+
+                        <!-- ── Compatibilité véhicule ─────────────────────────────── -->
+                        <div class="col-12">
+                            <hr class="my-1">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-semibold small text-muted text-uppercase">
+                                    <i class="bi bi-truck me-1"></i>Compatibilité véhicule
+                                </span>
+                                <span class="text-muted" style="font-size:.8rem;">Spécifiez les véhicules compatibles pour faciliter la recherche</span>
+                            </div>
+
+                            {{ compat_formset.management_form }}
+
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-2 align-middle" id="compat-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="min-width:170px">Marque véhicule *</th>
+                                            <th style="min-width:150px">Modèle</th>
+                                            <th style="width:95px">Année début</th>
+                                            <th style="width:95px">Année fin</th>
+                                            <th style="width:140px">Carburant</th>
+                                            <th style="width:42px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="compat-tbody">
+                                        {% for cf in compat_formset %}
+                                        <tr class="compat-row">
+                                            {{ cf.id }}
+                                            <td class="d-none">{{ cf.DELETE }}</td>
+                                            <td>{{ cf.marque }}{% if cf.marque.errors %}<div class="text-danger small">{{ cf.marque.errors }}</div>{% endif %}</td>
+                                            <td>{{ cf.modele }}</td>
+                                            <td>{{ cf.annee_debut }}</td>
+                                            <td>{{ cf.annee_fin }}</td>
+                                            <td>{{ cf.carburant }}</td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-outline-danger p-1 lh-1" onclick="supprimerCompat(this)" title="Supprimer">
+                                                    <i class="bi bi-trash3" style="font-size:.8rem;"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="ajouterCompat()">
+                                <i class="bi bi-plus-circle me-1"></i>Ajouter une compatibilité
+                            </button>
+                        </div>
+
+                        <!-- Template vide pour clonage JS -->
+                        <script type="text/template" id="compat-empty-form">
+                            {% with cf=compat_formset.empty_form %}
+                            <tr class="compat-row" id="compat-row-__prefix__">
+                                {{ cf.id }}
+                                <td class="d-none">{{ cf.DELETE }}</td>
+                                <td>{{ cf.marque }}</td>
+                                <td>{{ cf.modele }}</td>
+                                <td>{{ cf.annee_debut }}</td>
+                                <td>{{ cf.annee_fin }}</td>
+                                <td>{{ cf.carburant }}</td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-danger p-1 lh-1" onclick="supprimerCompat(this)" title="Supprimer">
+                                        <i class="bi bi-trash3" style="font-size:.8rem;"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        </script>
                         <div class="col-12">
                             <label class="form-label">Description</label>
                             {{ form.description }}
@@ -207,7 +283,71 @@
 
 {% block extra_js %}
 <script>
-// Prévisualisation photo principale
+// ── Compatibilité véhicule — Tom Select dynamique ─────────────────────────────
+const MARQUES_COMPAT = {{ marques_existantes|safe }};
+const MODELES_COMPAT = {{ modeles_existants|safe }};
+let compatTotal = parseInt(document.getElementById('id_compatibilites-TOTAL_FORMS').value);
+
+function initCompatRow(row) {
+    const marqueInput = row.querySelector('.compat-marque');
+    const modeleInput = row.querySelector('.compat-modele');
+
+    if (marqueInput && !marqueInput.tomselect) {
+        const tsMarque = new TomSelect(marqueInput, {
+            create: true,
+            createOnBlur: true,
+            maxOptions: 80,
+            options: MARQUES_COMPAT.map(m => ({ value: m, text: m })),
+            placeholder: 'Tapez ou sélectionnez…',
+            onChange(val) {
+                if (!modeleInput || !modeleInput.tomselect) return;
+                const opts = MODELES_COMPAT
+                    .filter(m => m.marque === val && m.modele)
+                    .map(m => ({ value: m.modele, text: m.modele }));
+                modeleInput.tomselect.clearOptions();
+                modeleInput.tomselect.addOptions(opts);
+            },
+        });
+    }
+
+    if (modeleInput && !modeleInput.tomselect) {
+        const currentMarque = marqueInput ? marqueInput.value : '';
+        const opts = currentMarque
+            ? MODELES_COMPAT.filter(m => m.marque === currentMarque && m.modele).map(m => ({ value: m.modele, text: m.modele }))
+            : MODELES_COMPAT.filter(m => m.modele).map(m => ({ value: m.modele, text: m.modele }));
+        new TomSelect(modeleInput, {
+            create: true,
+            createOnBlur: true,
+            maxOptions: 100,
+            options: opts,
+            placeholder: 'Tapez ou sélectionnez…',
+        });
+    }
+}
+
+function ajouterCompat() {
+    const template = document.getElementById('compat-empty-form').innerHTML;
+    const html = template.replace(/__prefix__/g, String(compatTotal));
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = html;
+    const newRow = tmp.querySelector('tr');
+    document.getElementById('compat-tbody').appendChild(newRow);
+    initCompatRow(newRow);
+    compatTotal++;
+    document.getElementById('id_compatibilites-TOTAL_FORMS').value = compatTotal;
+}
+
+function supprimerCompat(btn) {
+    const row = btn.closest('tr');
+    const del = row.querySelector('input[name$="-DELETE"]');
+    if (del) del.checked = true;
+    row.style.display = 'none';
+}
+
+// Initialiser Tom Select sur les lignes existantes au chargement
+document.querySelectorAll('#compat-tbody .compat-row').forEach(initCompatRow);
+
+// ── Prévisualisation photo principale ────────────────────────────────────────
 document.getElementById('id_image').addEventListener('change', function () {
     const file = this.files[0];
     if (!file) return;

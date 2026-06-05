@@ -1,4 +1,4 @@
-"""StockPro SN — Configuration des URLs"""
+"""StockPro Automobile — Configuration des URLs"""
 
 from django.contrib import admin
 from django.contrib.admin import AdminSite
@@ -68,6 +68,6 @@ if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # Personnalisation de l'interface admin
-admin.site.site_header = 'StockPro SN — Administration'
-admin.site.site_title = 'StockPro SN'
+admin.site.site_header = 'StockPro Automobile — Administration'
+admin.site.site_title = 'StockPro Automobile'
 admin.site.index_title = 'Panneau d\'administration'

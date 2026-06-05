@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}StockPro SN{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>{% block title %}StockPro Automobile{% endblock %}</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
@@ -79,7 +80,7 @@
 <!-- Sidebar -->
 <nav class="sidebar d-flex flex-column" id="sidebar">
     <div class="brand">
-        <span class="text-white fw-bold fs-5"><i class="bi bi-box-seam me-2"></i>StockPro SN</span>
+        <span class="text-white fw-bold fs-5"><i class="bi bi-box-seam me-2"></i>StockPro Automobile</span>
         {% if entreprise %}<div class="text-white-50 small mt-1">{{ entreprise.nom }}</div>{% endif %}
     </div>
     <div class="flex-grow-1 py-2">
@@ -264,7 +265,7 @@
 <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('show');
     document.getElementById('sidebarOverlay').classList.toggle('show');
@@ -288,7 +289,7 @@ function toggleSidebar() {
         </div>
     </div>
 </div>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
     const DUREE_SESSION = 8 * 60 * 60 * 1000;  // 8h en ms
     const ALERTE_AVANT  = 5 * 60 * 1000;        // Alerte 5 min avant

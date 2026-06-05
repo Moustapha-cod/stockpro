@@ -32,4 +32,12 @@ urlpatterns = [
 
     # API
     path('api/produits/', views.api_produits_search, name='api_produits_search'),
+    path('api/compat-suggestions/', views.api_compat_suggestions, name='api_compat_suggestions'),
+
+    # Panier
+    path('panier/ajouter/<int:pk>/', views.panier_ajouter, name='panier_ajouter'),
+    path('panier/retirer/<int:pk>/', views.panier_retirer, name='panier_retirer'),
+    path('panier/quantite/<int:pk>/', views.panier_maj_quantite, name='panier_maj_quantite'),
+    path('panier/vider/', views.panier_vider, name='panier_vider'),
+    path('panier/info/', views.panier_info, name='panier_info'),
 ]

@@ -26,8 +26,15 @@ class LoginView(FormView):
         return form_class(self.request, **self.get_form_kwargs())
 
     def form_valid(self, form):
+        from django.utils import timezone
         user = form.get_user()
         login(self.request, user)
+        # Met à jour derniere_connexion du profil (#13) — Django met à jour user.last_login
+        # automatiquement ; ce champ est celui affiché dans l'interface admin/profil.
+        if hasattr(user, 'profil'):
+            ProfilUtilisateur.objects.filter(pk=user.profil.pk).update(
+                derniere_connexion=timezone.now()
+            )
         logger.info(f"CONNEXION_OK user={user.email} ip={self.request.META.get('REMOTE_ADDR')}")
         return super().form_valid(form)
 
@@ -200,6 +207,10 @@ def utilisateur_toggle_actif(request, pk):
     if request.method == 'POST':
         profil.actif = not profil.actif
         profil.save(update_fields=['actif'])
+        # Synchronise le flag Django is_active pour que les sessions existantes soient
+        # immédiatement rejetées par l'authentification (fix #12)
+        profil.utilisateur.is_active = profil.actif
+        profil.utilisateur.save(update_fields=['is_active'])
         etat = 'activé' if profil.actif else 'désactivé'
         logger.info(
             f"USER_TOGGLE_ACTIF target={profil.utilisateur.email} actif={profil.actif} "

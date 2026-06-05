@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+{% load humanize %}
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Facture {{ facture.numero }}</title>
+<style>
+@page {
+    size: A4;
+    margin: 1.5cm 2cm 1.5cm 2cm;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 12px;
+    color: #222;
+    line-height: 1.45;
+}
+
+/* ── En-tête ─────────────────────────────────────────────── */
+.header-wrap {
+    border-bottom: 3px solid #1a237e;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    width: 100%;
+}
+.header-table { width: 100%; border-collapse: collapse; }
+.company-name { font-size: 18px; font-weight: bold; color: #1a237e; margin-bottom: 3px; }
+.company-info { color: #555; font-size: 10px; margin-top: 1px; }
+.facture-title { font-size: 22px; font-weight: bold; color: #1a237e; text-align: right; }
+.facture-num   { font-size: 11px; color: #555; text-align: right; margin-top: 2px; }
+
+/* ── Badge statut ────────────────────────────────────────── */
+.statut-wrap { text-align: right; margin-top: 7px; }
+.statut-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: .05em;
+    border: 1.5px solid;
+}
+.statut-payee     { background: #d1e7dd; color: #0a3622; border-color: #0a3622; }
+.statut-partielle { background: #fff3cd; color: #664d03; border-color: #664d03; }
+.statut-emise     { background: #cfe2ff; color: #084298; border-color: #084298; }
+.statut-annulee   { background: #e2e3e5; color: #41464b; border-color: #41464b; }
+.retard { color: #dc3545; font-size: 9px; font-weight: bold; margin-top: 3px; text-align: right; }
+
+/* ── Boîtes info ─────────────────────────────────────────── */
+.info-section { width: 100%; margin-bottom: 18px; border-collapse: collapse; }
+.info-box {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 10px 12px;
+    vertical-align: top;
+}
+.info-label {
+    font-size: 8px;
+    text-transform: uppercase;
+    color: #888;
+    font-weight: bold;
+    letter-spacing: .08em;
+    margin-bottom: 3px;
+}
+.info-value { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
+.info-sub   { color: #555; font-size: 10px; margin-top: 1px; }
+.info-sublabel {
+    font-size: 8px;
+    text-transform: uppercase;
+    color: #888;
+    font-weight: bold;
+    letter-spacing: .08em;
+    margin-top: 8px;
+    margin-bottom: 2px;
+}
+
+/* ── Objet ───────────────────────────────────────────────── */
+.objet-line { font-size: 11px; color: #555; margin-bottom: 12px; }
+
+/* ── Tableau lignes facture ──────────────────────────────── */
+.table-lignes { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+.table-lignes thead tr { background: #1a237e; color: #fff; }
+.table-lignes thead th {
+    padding: 6px 8px;
+    font-size: 8.5px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    text-align: left;
+}
+.table-lignes thead th.right  { text-align: right; }
+.table-lignes thead th.center { text-align: center; }
+.table-lignes tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 11px;
+    vertical-align: top;
+}
+.table-lignes tbody tr.last-row td { border-bottom: none; }
+.text-right  { text-align: right; }
+.text-center { text-align: center; }
+.text-muted  { color: #888; }
+.text-small  { font-size: 10px; }
+.fw-bold     { font-weight: bold; }
+.fw-semi     { font-weight: 600; }
+.text-success { color: #198754; }
+.text-danger  { color: #dc3545; }
+
+/* ── Totaux ──────────────────────────────────────────────── */
+.totaux-outer { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.totaux-table { width: 100%; border-collapse: collapse; }
+.totaux-table td { padding: 3px 6px; font-size: 11px; }
+.totaux-table .row-total td {
+    border-top: 2px solid #1a237e;
+    font-size: 13px;
+    font-weight: bold;
+    color: #1a237e;
+    padding-top: 6px;
+}
+
+/* ── Barre paiement ──────────────────────────────────────── */
+.progress-bg  { background: #e9ecef; height: 7px; width: 100%; margin-top: 6px; }
+.progress-bar { background: #198754; height: 7px; }
+.progress-label { text-align: right; font-size: 9px; color: #888; margin-top: 2px; }
+
+/* ── Tableau paiements ───────────────────────────────────── */
+.section-title {
+    font-size: 9px; text-transform: uppercase; color: #888;
+    font-weight: bold; letter-spacing: .08em;
+    margin-bottom: 5px; margin-top: 18px;
+}
+.table-paiements { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+.table-paiements thead th {
+    background: #f0f0f0;
+    padding: 4px 8px;
+    font-weight: bold;
+    text-align: left;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.table-paiements thead th.right { text-align: right; }
+.table-paiements tbody td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; }
+
+/* ── Notes ───────────────────────────────────────────────── */
+.notes-box {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 10px 12px;
+    font-size: 10.5px;
+    margin-top: 18px;
+}
+.notes-label {
+    font-size: 8.5px; text-transform: uppercase; color: #888;
+    font-weight: bold; letter-spacing: .08em; margin-bottom: 5px;
+}
+
+/* ── Pied de page ────────────────────────────────────────── */
+.footer-text {
+    border-top: 1px solid #dee2e6;
+    margin-top: 22px;
+    padding-top: 10px;
+    font-size: 9px;
+    color: #888;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+
+<!-- ── EN-TÊTE ──────────────────────────────────────────────────────────── -->
+<div class="header-wrap">
+    <table class="header-table" cellspacing="0" cellpadding="0">
+        <tr>
+            <td style="width:58%; vertical-align:top;">
+                {% if entreprise.logo %}
+                <img src="{{ entreprise.logo.url }}" alt="{{ entreprise.nom }}"
+                     width="110" style="margin-bottom:5px;"><br>
+                {% endif %}
+                <div class="company-name" style="margin-top:6px;">{{ entreprise.nom }}</div>
+                {% if entreprise.adresse %}<div class="company-info">{{ entreprise.adresse }}</div>{% endif %}
+                {% if entreprise.telephone %}<div class="company-info">Tél : {{ entreprise.telephone }}</div>{% endif %}
+                {% if entreprise.email %}<div class="company-info">{{ entreprise.email }}</div>{% endif %}
+                {% if entreprise.ninea %}<div class="company-info">NINEA : {{ entreprise.ninea }}</div>{% endif %}
+                {% if entreprise.registre_commerce %}<div class="company-info">RC : {{ entreprise.registre_commerce }}</div>{% endif %}
+            </td>
+            <td style="width:42%; vertical-align:top;">
+                <div class="facture-title">FACTURE</div>
+                <div class="facture-num">N° {{ facture.numero }}</div>
+                <div class="statut-wrap">
+                    <span class="statut-badge statut-{{ facture.statut }}">
+                        {{ facture.get_statut_display|upper }}
+                    </span>
+                </div>
+                {% if facture.est_en_retard %}
+                <div class="retard">&#9888; Paiement en retard</div>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- ── INFOS CLIENT / DATES ─────────────────────────────────────────────── -->
+<table class="info-section" cellspacing="0" cellpadding="0">
+    <tr>
+        <td style="width:46%; padding-right:12px;" class="info-box">
+            <div class="info-label">Facturé à</div>
+            <div class="info-value">{{ facture.client.nom }}</div>
+            {% if facture.client.contact %}<div class="info-sub">{{ facture.client.contact }}</div>{% endif %}
+            {% if facture.client.telephone %}<div class="info-sub">{{ facture.client.telephone }}</div>{% endif %}
+            {% if facture.client.email %}<div class="info-sub">{{ facture.client.email }}</div>{% endif %}
+            {% if facture.client.adresse %}<div class="info-sub">{{ facture.client.adresse }}</div>{% endif %}
+            {% if facture.client.ninea %}<div class="info-sub">NINEA : {{ facture.client.ninea }}</div>{% endif %}
+        </td>
+        <td style="width:6%;"></td>
+        <td style="width:48%;" class="info-box">
+            <table width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                    <td style="width:50%; vertical-align:top; padding-right:6px;">
+                        <div class="info-label">Date d'émission</div>
+                        <div class="info-value">{{ facture.date_emission|date:"d/m/Y" }}</div>
+                    </td>
+                    <td style="width:50%; vertical-align:top;">
+                        {% if facture.date_echeance %}
+                        <div class="info-label">Échéance</div>
+                        <div class="info-value {% if facture.est_en_retard %}text-danger{% endif %}">
+                            {{ facture.date_echeance|date:"d/m/Y" }}
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="padding-top:8px;">
+                        <div class="info-sublabel">Mode de paiement</div>
+                        <div class="info-value">{{ facture.get_mode_paiement_display }}</div>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+{% if facture.objet %}
+<div class="objet-line"><strong>Objet :</strong> {{ facture.objet }}</div>
+{% endif %}
+
+<!-- ── LIGNES ────────────────────────────────────────────────────────────── -->
+<table class="table-lignes" cellspacing="0" cellpadding="0">
+    <thead>
+        <tr>
+            <th style="width:5%">#</th>
+            <th style="width:38%">Désignation</th>
+            <th style="width:10%">Réf.</th>
+            <th class="center" style="width:9%">Qté</th>
+            <th class="right"  style="width:14%">PU HT</th>
+            <th class="center" style="width:9%">Remise</th>
+            <th class="right"  style="width:15%">Total HT</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ligne in lignes %}
+        <tr{% if forloop.last %} class="last-row"{% endif %}>
+            <td class="text-muted">{{ forloop.counter }}</td>
+            <td class="fw-semi">{{ ligne.designation }}</td>
+            <td class="text-muted text-small">{{ ligne.reference|default:"—" }}</td>
+            <td class="text-center">{{ ligne.quantite }}</td>
+            <td class="text-right">{{ ligne.prix_unitaire_ht|floatformat:2|intcomma }}</td>
+            <td class="text-center text-muted">{% if ligne.remise %}{{ ligne.remise }}%{% else %}—{% endif %}</td>
+            <td class="text-right fw-semi">{{ ligne.montant_ht|floatformat:2|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr class="last-row"><td colspan="7" class="text-center text-muted" style="padding:14px;">Aucune ligne</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- ── TOTAUX ─────────────────────────────────────────────────────────────── -->
+<table class="totaux-outer" cellspacing="0" cellpadding="0">
+    <tr>
+        <td style="width:55%;"></td>
+        <td style="width:45%; vertical-align:top;">
+            <table class="totaux-table" cellspacing="0" cellpadding="0">
+                <tr>
+                    <td class="text-muted">Sous-total HT</td>
+                    <td class="text-right">{{ facture.montant_ht|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                {% if facture.remise_globale and facture.remise_globale > 0 %}
+                <tr>
+                    <td class="text-muted">Remise globale ({{ facture.remise_globale }}%)</td>
+                    <td class="text-right text-danger">incluse</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td class="text-muted">TVA ({{ facture.taux_tva }}%)</td>
+                    <td class="text-right">{{ facture.montant_tva|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                <tr class="row-total">
+                    <td>TOTAL TTC</td>
+                    <td class="text-right">{{ facture.montant_ttc|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                {% if facture.montant_paye > 0 %}
+                <tr>
+                    <td class="text-success">Déjà payé</td>
+                    <td class="text-right text-success">- {{ facture.montant_paye|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">Reste dû</td>
+                    <td class="text-right fw-bold {% if facture.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ facture.montant_restant|floatformat:2|intcomma }} {{ entreprise.devise }}
+                    </td>
+                </tr>
+                {% endif %}
+            </table>
+
+            {% if facture.montant_ttc > 0 and facture.montant_paye > 0 %}
+            <div class="progress-bg">
+                <div class="progress-bar" style="width:{{ facture.taux_paiement }}%;"></div>
+            </div>
+            <div class="progress-label">{{ facture.taux_paiement }}% payé</div>
+            {% endif %}
+        </td>
+    </tr>
+</table>
+
+<!-- ── HISTORIQUE PAIEMENTS ──────────────────────────────────────────────── -->
+{% if paiements %}
+<div class="section-title">Historique des paiements</div>
+<table class="table-paiements" cellspacing="0" cellpadding="0">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Mode</th>
+            <th>Référence</th>
+            <th class="right">Montant</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in paiements %}
+        <tr>
+            <td>{{ p.date_paiement|date:"d/m/Y" }}</td>
+            <td>{{ p.get_mode_paiement_display }}</td>
+            <td class="text-muted">{{ p.reference_paiement|default:"—" }}</td>
+            <td class="text-right fw-semi text-success">{{ p.montant|floatformat:2|intcomma }} {{ entreprise.devise }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- ── NOTES ─────────────────────────────────────────────────────────────── -->
+{% if facture.notes %}
+<div class="notes-box">
+    <div class="notes-label">Notes / Conditions</div>
+    {{ facture.notes }}
+</div>
+{% endif %}
+
+<!-- ── PIED DE PAGE ───────────────────────────────────────────────────────── -->
+<div class="footer-text">
+    {% if entreprise.mentions_facture %}<div style="margin-bottom:2px;">{{ entreprise.mentions_facture }}</div>{% endif %}
+    <div>{{ entreprise.nom }}
+        {% if entreprise.ninea %} — NINEA : {{ entreprise.ninea }}{% endif %}
+        {% if entreprise.registre_commerce %} — RC : {{ entreprise.registre_commerce }}{% endif %}
+    </div>
+    {% if entreprise.telephone or entreprise.email %}
+    <div>
+        {% if entreprise.telephone %}Tél : {{ entreprise.telephone }}{% endif %}
+        {% if entreprise.email %} — {{ entreprise.email }}{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+</body>
+</html>
