@@ -177,7 +177,7 @@
     <!-- Topbar -->
     <div class="topbar d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="toggleSidebar()">
+            <button class="btn btn-sm btn-outline-secondary d-md-none" id="sidebarToggleBtn">
                 <i class="bi bi-list fs-5"></i>
             </button>
             <h6 class="mb-0 fw-semibold text-secondary">{% block page_title %}{% endblock %}</h6>
@@ -270,6 +270,10 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('show');
     document.getElementById('sidebarOverlay').classList.toggle('show');
 }
+document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.getElementById('sidebarToggleBtn');
+    if (btn) btn.addEventListener('click', toggleSidebar);
+});
 </script>
 
 {% if user.is_authenticated %}
@@ -282,7 +286,7 @@ function toggleSidebar() {
             </div>
             <div class="modal-body text-center py-3">
                 <p class="mb-3 small">Votre session expire dans <strong id="sessionCountdown">5:00</strong>.<br>Voulez-vous rester connecté ?</p>
-                <button onclick="prolongerSession()" class="btn btn-warning btn-sm px-4">
+                <button id="btnProlongerSession" class="btn btn-warning btn-sm px-4">
                     <i class="bi bi-arrow-clockwise me-1"></i>Rester connecté
                 </button>
             </div>
@@ -318,13 +322,18 @@ function toggleSidebar() {
         }, 1000);
     }
 
-    window.prolongerSession = function () {
+    function prolongerSession() {
         fetch('/dashboard/', {credentials: 'same-origin'}).finally(() => {
             if (modalInstance) modalInstance.hide();
             clearInterval(countdown);
             setTimeout(afficherAlerte, DUREE_SESSION - ALERTE_AVANT);
         });
-    };
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('btnProlongerSession');
+        if (btn) btn.addEventListener('click', prolongerSession);
+    });
 
     setTimeout(afficherAlerte, DUREE_SESSION - ALERTE_AVANT);
 })();
