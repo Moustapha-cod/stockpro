@@ -12,14 +12,17 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
     {% block extra_css %}{% endblock %}
     <style>
-        body { background-color: #f8f9fa; }
+        /* ── Base ─────────────────────────────────────────────────────────── */
+        body { background-color: #f8f9fa; overflow-x: hidden; }
+
+        /* ── Sidebar ──────────────────────────────────────────────────────── */
         .sidebar {
             height: 100vh;
             background: linear-gradient(180deg, #1a237e 0%, #283593 100%);
             width: 250px;
             position: fixed;
             top: 0; left: 0;
-            z-index: 100;
+            z-index: 1045;
             box-shadow: 2px 0 10px rgba(0,0,0,0.2);
             overflow-y: auto;
         }
@@ -31,12 +34,15 @@
             margin: 2px 8px;
             font-size: .9rem;
             transition: all .2s;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
         }
         .sidebar .nav-link:hover, .sidebar .nav-link.active {
             background: rgba(255,255,255,0.15);
             color: #fff;
         }
-        .sidebar .nav-link i { width: 20px; margin-right: 8px; }
+        .sidebar .nav-link i { width: 20px; margin-right: 8px; flex-shrink: 0; }
         .sidebar .nav-section {
             font-size: .7rem;
             text-transform: uppercase;
@@ -44,30 +50,67 @@
             color: rgba(255,255,255,0.4);
             padding: .8rem 1.2rem .2rem;
         }
+
+        /* ── Layout principal ─────────────────────────────────────────────── */
         .main-content { margin-left: 250px; }
         .topbar {
             background: #fff;
             border-bottom: 1px solid #dee2e6;
             padding: .75rem 1.5rem;
-            position: sticky; top: 0; z-index: 99;
+            position: sticky; top: 0; z-index: 1030;
             box-shadow: 0 1px 4px rgba(0,0,0,.06);
         }
         .page-content { padding: 1.5rem; }
-        @media (max-width: 768px) {
+
+        /* ── Tables responsives globalement ───────────────────────────────── */
+        .table-responsive-auto {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ── Overlay mobile ───────────────────────────────────────────────── */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 1040;
+            cursor: pointer;
+        }
+        .sidebar-overlay.show { display: block; }
+
+        /* ── Tablette (< 992px) ───────────────────────────────────────────── */
+        @media (max-width: 991.98px) {
+            .sidebar { width: 230px; }
+            .main-content { margin-left: 230px; }
+            .page-content { padding: 1rem; }
+            .topbar { padding: .65rem 1rem; }
+        }
+
+        /* ── Mobile (< 768px) ─────────────────────────────────────────────── */
+        @media (max-width: 767.98px) {
             .sidebar {
+                width: 270px;
                 transform: translateX(-100%);
-                transition: transform .3s ease;
+                transition: transform .28s cubic-bezier(.4,0,.2,1);
             }
             .sidebar.show { transform: translateX(0); }
             .main-content { margin-left: 0; }
-            .sidebar-overlay {
-                display: none;
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,.5);
-                z-index: 99;
-            }
-            .sidebar-overlay.show { display: block; }
+            .page-content { padding: .75rem .6rem; }
+            .topbar { padding: .55rem .75rem; }
+            .topbar h6 { font-size: .82rem; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            /* Cacher le texte "Déconnexion" sur mobile, garder juste l'icône */
+            .btn-deconnexion-text { display: none; }
+            /* Cartes : supprimer les marges excessives */
+            .card { margin-bottom: .6rem; }
+            /* KPI cards : pleine largeur */
+            .row-kpi > [class*="col-"] { margin-bottom: .6rem; }
+        }
+
+        /* ── Très petits écrans (< 400px) ─────────────────────────────────── */
+        @media (max-width: 399.98px) {
+            .page-content { padding: .5rem .4rem; }
+            .sidebar { width: 85vw; }
         }
     </style>
 </head>
@@ -75,7 +118,7 @@
 
 {% if user.is_authenticated %}
 <!-- Overlay mobile -->
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
 <!-- Sidebar -->
 <nav class="sidebar d-flex flex-column" id="sidebar">
@@ -234,7 +277,7 @@
                 {% csrf_token %}
                 <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1">
                     <i class="bi bi-box-arrow-right"></i>
-                    <span>Déconnexion</span>
+                    <span class="btn-deconnexion-text">Déconnexion</span>
                 </button>
             </form>
         </div>
@@ -270,9 +313,33 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('show');
     document.getElementById('sidebarOverlay').classList.toggle('show');
 }
+
 document.addEventListener('DOMContentLoaded', function () {
+    // Bouton hamburger
     var btn = document.getElementById('sidebarToggleBtn');
     if (btn) btn.addEventListener('click', toggleSidebar);
+
+    // Overlay : clic pour fermer la sidebar
+    var overlay = document.getElementById('sidebarOverlay');
+    if (overlay) overlay.addEventListener('click', toggleSidebar);
+
+    // Fermer la sidebar sur clic d'un lien (mobile)
+    document.querySelectorAll('.sidebar .nav-link').forEach(function (link) {
+        link.addEventListener('click', function () {
+            if (window.innerWidth < 768) toggleSidebar();
+        });
+    });
+
+    // Rendre toutes les tables responsives automatiquement
+    document.querySelectorAll('.page-content table').forEach(function (table) {
+        if (!table.parentElement.classList.contains('table-responsive-auto') &&
+            !table.parentElement.classList.contains('table-responsive')) {
+            var wrapper = document.createElement('div');
+            wrapper.className = 'table-responsive-auto';
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+        }
+    });
 });
 </script>
 
