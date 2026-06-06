@@ -80,16 +80,8 @@
         }
         .sidebar-overlay.show { display: block; }
 
-        /* ── Tablette (< 992px) ───────────────────────────────────────────── */
+        /* ── Tablette + Mobile (< 992px) : sidebar cachée, hamburger visible ── */
         @media (max-width: 991.98px) {
-            .sidebar { width: 230px; }
-            .main-content { margin-left: 230px; }
-            .page-content { padding: 1rem; }
-            .topbar { padding: .65rem 1rem; }
-        }
-
-        /* ── Mobile (< 768px) ─────────────────────────────────────────────── */
-        @media (max-width: 767.98px) {
             .sidebar {
                 width: 270px;
                 transform: translateX(-100%);
@@ -97,15 +89,19 @@
             }
             .sidebar.show { transform: translateX(0); }
             .main-content { margin-left: 0; }
-            .page-content { padding: .75rem .6rem; }
-            .topbar { padding: .55rem .75rem; }
-            .topbar h6 { font-size: .82rem; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            /* Cacher le texte "Déconnexion" sur mobile, garder juste l'icône */
+            .page-content { padding: 1rem .75rem; }
+            .topbar { padding: .6rem 1rem; }
+            .topbar h6 { font-size: .88rem; max-width: 55vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .btn-deconnexion-text { display: none; }
-            /* Cartes : supprimer les marges excessives */
+            .card { margin-bottom: .75rem; }
+            .row-kpi > [class*="col-"] { margin-bottom: .75rem; }
+        }
+
+        /* ── Mobile (< 576px) ─────────────────────────────────────────────── */
+        @media (max-width: 575.98px) {
+            .page-content { padding: .65rem .5rem; }
+            .topbar h6 { font-size: .82rem; max-width: 50vw; }
             .card { margin-bottom: .6rem; }
-            /* KPI cards : pleine largeur */
-            .row-kpi > [class*="col-"] { margin-bottom: .6rem; }
         }
 
         /* ── Très petits écrans (< 400px) ─────────────────────────────────── */
@@ -228,7 +224,7 @@
     <!-- Topbar -->
     <div class="topbar d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-sm btn-outline-secondary d-md-none" id="sidebarToggleBtn">
+            <button class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebarToggleBtn">
                 <i class="bi bi-list fs-5"></i>
             </button>
             <h6 class="mb-0 fw-semibold text-secondary">{% block page_title %}{% endblock %}</h6>
@@ -334,7 +330,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Fermer la sidebar sur clic d'un lien (mobile)
     document.querySelectorAll('.sidebar .nav-link').forEach(function (link) {
         link.addEventListener('click', function () {
-            if (window.innerWidth < 768) toggleSidebar();
+            if (window.innerWidth < 992) toggleSidebar();
         });
     });
 
