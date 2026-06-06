@@ -460,32 +460,33 @@ def _pdf_link_callback(uri, rel):
 
 @login_required
 def facture_telecharger_pdf(request, pk):
-    from xhtml2pdf import pisa
-    entreprise = request.entreprise
-    facture = get_object_or_404(Facture, pk=pk, entreprise=entreprise)
-    lignes = facture.lignes.select_related('produit').all()
-    paiements = facture.paiements.order_by('date_paiement')
+    import traceback as tb
     try:
+        from xhtml2pdf import pisa
+        entreprise = request.entreprise
+        facture = get_object_or_404(Facture, pk=pk, entreprise=entreprise)
+        lignes = facture.lignes.select_related('produit').all()
+        paiements = facture.paiements.order_by('date_paiement')
         html = render_to_string('facturation/facture_pdf.html', {
             'facture': facture,
             'lignes': lignes,
             'paiements': paiements,
             'entreprise': entreprise,
         }, request=request)
-    except Exception as e:
-        logger.exception('PDF render_to_string error')
-        return HttpResponse(f'Erreur rendu template : {e}', status=500)
-    buffer = io.BytesIO()
-    err_log = io.StringIO()
-    pisa_status = pisa.CreatePDF(html, dest=buffer, link_callback=_pdf_link_callback, log=err_log)
-    if pisa_status.err:
-        detail = err_log.getvalue() or str(pisa_status.err)
-        logger.error('PDF xhtml2pdf error: %s', detail)
-        return HttpResponse(f'Erreur PDF : {detail}', status=500, content_type='text/plain; charset=utf-8')
-    buffer.seek(0)
-    response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="facture_{facture.numero}.pdf"'
-    return response
+        buffer = io.BytesIO()
+        err_log = io.StringIO()
+        pisa_status = pisa.CreatePDF(html, dest=buffer, link_callback=_pdf_link_callback, log=err_log)
+        if pisa_status.err:
+            detail = err_log.getvalue() or str(pisa_status.err)
+            return HttpResponse(f'Erreur xhtml2pdf :\n{detail}', status=500, content_type='text/plain; charset=utf-8')
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="facture_{facture.numero}.pdf"'
+        return response
+    except Exception:
+        trace = tb.format_exc()
+        logger.exception('PDF generation error')
+        return HttpResponse(f'Exception:\n{trace}', status=500, content_type='text/plain; charset=utf-8')
 
 
 @login_required
