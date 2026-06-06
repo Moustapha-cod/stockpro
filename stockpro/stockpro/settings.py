@@ -183,7 +183,11 @@ LOCALE_PATHS = [BASE_DIR / 'locale']
 
 # ─── Fichiers statiques & médias ──────────────────────────────────────────────
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+_static_dirs = [BASE_DIR / 'static']
+_vps_static = BASE_DIR / 'stockpro' / 'static'
+if _vps_static.is_dir():
+    _static_dirs.append(_vps_static)
+STATICFILES_DIRS = _static_dirs
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
