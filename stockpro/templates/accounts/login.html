@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}Connexion - StockPro Automobile{% endblock %}
 
@@ -107,10 +108,8 @@
 <div class="login-wrapper">
     <!-- Panneau gauche -->
     <div class="login-brand">
-        <div class="brand-icon">
-            <i class="bi bi-box-seam"></i>
-        </div>
-        <h1>StockPro Automobile</h1>
+        <img src="{% static 'img/logo-connexion.jpeg' %}" alt="StockPro Automobile"
+             style="width:85%;max-width:320px;height:auto;border-radius:12px;margin-bottom:2rem;box-shadow:0 4px 20px rgba(0,0,0,0.2);">
         <p>Votre solution complète de gestion de stock et de facturation</p>
         <ul class="features">
             <li><i class="bi bi-check-circle-fill"></i> Gestion de stock en temps réel</li>
@@ -125,7 +124,8 @@
         <div class="login-card">
             <div class="text-center mb-4">
                 <div class="d-md-none mb-3">
-                    <i class="bi bi-box-seam text-primary" style="font-size:2.5rem;"></i>
+                    <img src="{% static 'img/logo-connexion-compact.jpeg' %}" alt="StockPro Automobile"
+                         style="width:80%;max-width:260px;height:auto;border-radius:10px;">
                 </div>
                 <h2 class="fw-bold" style="color:#1a237e;">Connexion</h2>
                 <p class="text-muted small">Accédez à votre espace de gestion</p>

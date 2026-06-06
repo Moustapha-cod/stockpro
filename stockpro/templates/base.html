@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}StockPro Automobile{% endblock %}</title>
     {% load static %}
+    <link rel="icon" type="image/jpeg" href="{% static 'img/favicon.jpeg' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
@@ -123,8 +124,9 @@
 <!-- Sidebar -->
 <nav class="sidebar d-flex flex-column" id="sidebar">
     <div class="brand">
-        <span class="text-white fw-bold fs-5"><i class="bi bi-box-seam me-2"></i>StockPro Automobile</span>
-        {% if entreprise %}<div class="text-white-50 small mt-1">{{ entreprise.nom }}</div>{% endif %}
+        <img src="{% static 'img/logo-sidebar.jpeg' %}" alt="StockPro Automobile"
+             style="width:100%;max-width:210px;height:auto;border-radius:6px;display:block;">
+        {% if entreprise %}<div class="text-white-50 small mt-2">{{ entreprise.nom }}</div>{% endif %}
     </div>
     <div class="flex-grow-1 py-2">
         {% if user.is_superuser %}
