@@ -124,9 +124,15 @@
 <!-- Sidebar -->
 <nav class="sidebar d-flex flex-column" id="sidebar">
     <div class="brand">
-        <img src="{% static 'img/logo-sidebar.jpeg' %}" alt="StockPro Automobile"
-             style="width:100%;max-width:210px;height:auto;border-radius:6px;display:block;">
-        {% if entreprise %}<div class="text-white-50 small mt-2">{{ entreprise.nom }}</div>{% endif %}
+        {% if entreprise and entreprise.logo %}
+        <img src="{{ entreprise.logo.url }}" alt="{{ entreprise.nom }}"
+             style="max-width:180px;max-height:70px;width:auto;height:auto;border-radius:6px;display:block;object-fit:contain;">
+        <div class="text-white-50 small mt-2">{{ entreprise.nom }}</div>
+        {% elif entreprise %}
+        <span class="text-white fw-bold fs-5">{{ entreprise.nom }}</span>
+        {% else %}
+        <span class="text-white fw-bold fs-5">StockPro Automobile</span>
+        {% endif %}
     </div>
     <div class="flex-grow-1 py-2">
         {% if user.is_superuser %}
