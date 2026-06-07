@@ -17,17 +17,23 @@
         body { background-color: #f8f9fa; overflow-x: hidden; }
         img { max-width: 100%; height: auto; }
 
-        /* ── Sidebar ──────────────────────────────────────────────────────── */
+        /* ── Sidebar — mobile-first : cachée par défaut ──────────────────── */
         .sidebar {
             height: 100vh;
             background: linear-gradient(180deg, #1a237e 0%, #283593 100%);
-            width: 250px;
+            width: 270px;
             position: fixed;
             top: 0; left: 0;
             z-index: 1045;
             box-shadow: 2px 0 10px rgba(0,0,0,0.2);
             overflow-y: auto;
+            /* Cachée par défaut (mobile) — sera montrée sur desktop via min-width */
+            transform: translateX(-100%);
+            transition: transform .28s cubic-bezier(.4,0,.2,1);
         }
+        /* Ouverte via JS (hamburger) */
+        .sidebar.show { transform: translateX(0); }
+
         .sidebar .brand { padding: 1.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar .nav-link {
             color: rgba(255,255,255,0.8);
@@ -53,8 +59,8 @@
             padding: .8rem 1.2rem .2rem;
         }
 
-        /* ── Layout principal ─────────────────────────────────────────────── */
-        .main-content { margin-left: 250px; }
+        /* ── Layout principal — mobile-first ─────────────────────────────── */
+        .main-content { margin-left: 0; }
         .topbar {
             background: #fff;
             border-bottom: 1px solid #dee2e6;
@@ -62,7 +68,7 @@
             position: sticky; top: 0; z-index: 1030;
             box-shadow: 0 1px 4px rgba(0,0,0,.06);
         }
-        .page-content { padding: 1.5rem; }
+        .page-content { padding: 1rem .75rem; }
 
         /* ── Tables responsives globalement ───────────────────────────────── */
         .table-responsive-auto {
@@ -81,31 +87,31 @@
         }
         .sidebar-overlay.show { display: block; }
 
-        /* ── Tablette + Mobile (< 992px) : sidebar cachée, hamburger visible ── */
-        @media (max-width: 991.98px) {
+        /* ── Desktop (≥ 992px) : sidebar toujours visible ────────────────── */
+        @media (min-width: 992px) {
             .sidebar {
-                width: 270px;
-                transform: translateX(-100%);
-                transition: transform .28s cubic-bezier(.4,0,.2,1);
+                width: 250px;
+                transform: translateX(0);
             }
-            .sidebar.show { transform: translateX(0); }
-            .main-content { margin-left: 0; }
-            .page-content { padding: 1rem .75rem; }
-            .topbar { padding: .6rem 1rem; }
+            .main-content { margin-left: 250px; }
+            .page-content { padding: 1.5rem; }
+            .topbar { padding: .75rem 1.5rem; }
+        }
+
+        /* ── Tablette + Mobile (< 992px) ─────────────────────────────────── */
+        @media (max-width: 991.98px) {
             .topbar h6 { font-size: .88rem; max-width: 55vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .btn-deconnexion-text { display: none; }
             .card { margin-bottom: .75rem; }
-            .row-kpi > [class*="col-"] { margin-bottom: .75rem; }
         }
 
         /* ── Mobile (< 576px) ─────────────────────────────────────────────── */
         @media (max-width: 575.98px) {
             .page-content { padding: .65rem .5rem; }
+            .topbar { padding: .5rem .75rem; }
             .topbar h6 { font-size: .82rem; max-width: 50vw; }
             .card { margin-bottom: .6rem; }
-            /* Inputs filtres : largeur auto sur mobile */
-            .form-control, .form-select { width: 100% !important; min-width: 0 !important; }
-            /* Groupes de boutons : wrap */
+            .form-control, .form-select { min-width: 0 !important; }
             .btn-group { flex-wrap: wrap; }
         }
 
