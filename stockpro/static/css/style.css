@@ -11,7 +11,7 @@ body {
 }
 
 .card {
-    border: none;
+    border: 1px solid rgba(0, 0, 0, 0.09);
     border-radius: 0.5rem;
 }
 
