@@ -14,12 +14,8 @@
     {% block extra_css %}{% endblock %}
     <style>
         /* ── Base ─────────────────────────────────────────────────────────── */
-        body { background-color: #f8f9fa; overflow-x: clip; }
-        /* Empêche tout élément de dépasser la largeur de l'écran */
-        *, *::before, *::after { box-sizing: border-box; }
+        body { background-color: #f8f9fa; overflow-x: hidden; }
         img { max-width: 100%; height: auto; }
-        /* Fix sticky topbar sur Android Chrome : wrapper gère l'overflow */
-        .main-content { overflow-x: clip; }
 
         /* ── Sidebar ──────────────────────────────────────────────────────── */
         .sidebar {
