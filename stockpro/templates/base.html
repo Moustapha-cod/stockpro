@@ -14,7 +14,12 @@
     {% block extra_css %}{% endblock %}
     <style>
         /* ── Base ─────────────────────────────────────────────────────────── */
-        body { background-color: #f8f9fa; overflow-x: hidden; }
+        body { background-color: #f8f9fa; overflow-x: clip; }
+        /* Empêche tout élément de dépasser la largeur de l'écran */
+        *, *::before, *::after { box-sizing: border-box; }
+        img { max-width: 100%; height: auto; }
+        /* Fix sticky topbar sur Android Chrome : wrapper gère l'overflow */
+        .main-content { overflow-x: clip; }
 
         /* ── Sidebar ──────────────────────────────────────────────────────── */
         .sidebar {
@@ -102,6 +107,10 @@
             .page-content { padding: .65rem .5rem; }
             .topbar h6 { font-size: .82rem; max-width: 50vw; }
             .card { margin-bottom: .6rem; }
+            /* Inputs filtres : largeur auto sur mobile */
+            .form-control, .form-select { width: 100% !important; min-width: 0 !important; }
+            /* Groupes de boutons : wrap */
+            .btn-group { flex-wrap: wrap; }
         }
 
         /* ── Très petits écrans (< 400px) ─────────────────────────────────── */
