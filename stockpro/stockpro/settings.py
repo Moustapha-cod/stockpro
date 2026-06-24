@@ -183,12 +183,18 @@ LOCALE_PATHS = [BASE_DIR / 'locale']
 
 # ─── Fichiers statiques & médias ──────────────────────────────────────────────
 STATIC_URL = '/static/'
-_static_dirs = [BASE_DIR / 'static']
-_vps_static = BASE_DIR / 'stockpro' / 'static'
-if _vps_static.is_dir():
-    _static_dirs.append(_vps_static)
-STATICFILES_DIRS = _static_dirs
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Cherche le dossier static/ dans tous les emplacements possibles
+_settings_dir = Path(__file__).resolve().parent
+_static_candidates = [
+    BASE_DIR / 'static',                 # local : BASE_DIR/static/
+    _settings_dir / 'static',           # VPS : dossier adjacent à settings.py
+    BASE_DIR / 'stockpro' / 'static',   # autre variante VPS
+    _settings_dir.parent / 'static',    # remonte d'un cran
+]
+STATICFILES_DIRS = [p for p in dict.fromkeys(_static_candidates) if p.is_dir()]
+
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
