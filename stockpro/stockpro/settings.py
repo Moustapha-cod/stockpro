@@ -95,7 +95,7 @@ WSGI_APPLICATION = 'stockpro.wsgi.application'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [p for p in [BASE_DIR / 'templates', Path(__file__).resolve().parent.parent / 'templates'] if p.is_dir()],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
