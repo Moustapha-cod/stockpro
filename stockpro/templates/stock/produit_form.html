@@ -86,7 +86,7 @@
                                             <td>{{ cf.annee_fin }}</td>
                                             <td>{{ cf.carburant }}</td>
                                             <td class="text-center">
-                                                <button type="button" class="btn btn-sm btn-outline-danger p-1 lh-1" onclick="supprimerCompat(this)" title="Supprimer">
+                                                <button type="button" class="btn btn-sm btn-outline-danger p-1 lh-1 btn-supprimer-compat" title="Supprimer">
                                                     <i class="bi bi-trash3" style="font-size:.8rem;"></i>
                                                 </button>
                                             </td>
@@ -96,7 +96,7 @@
                                 </table>
                             </div>
 
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="ajouterCompat()">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btn-ajouter-compat">
                                 <i class="bi bi-plus-circle me-1"></i>Ajouter une compatibilité
                             </button>
                         </div>
@@ -113,7 +113,7 @@
                                 <td>{{ cf.annee_fin }}</td>
                                 <td>{{ cf.carburant }}</td>
                                 <td class="text-center">
-                                    <button type="button" class="btn btn-sm btn-outline-danger p-1 lh-1" onclick="supprimerCompat(this)" title="Supprimer">
+                                    <button type="button" class="btn btn-sm btn-outline-danger p-1 lh-1 btn-supprimer-compat" title="Supprimer">
                                         <i class="bi bi-trash3" style="font-size:.8rem;"></i>
                                     </button>
                                 </td>
@@ -201,12 +201,11 @@
 
                     <!-- Photos existantes -->
                     {% if photos %}
-                    <div class="d-flex flex-wrap gap-2 mb-3">
+                    <div id="galerie-photos" class="d-flex flex-wrap gap-2 mb-3">
                         {% for photo in photos %}
                         <div class="position-relative" style="width:100px;">
                             <img src="{{ photo.image.url }}" alt="{{ photo.legende }}"
                                  data-index="{{ forloop.counter0 }}"
-                                 onclick="ouvrirGalerie(this)"
                                  style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;cursor:zoom-in;">
                             {% if photo.legende %}
                             <div class="text-muted mt-1" style="font-size:.7rem;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ photo.legende }}</div>
@@ -264,15 +263,15 @@
                 <img id="modalGalerieImg" src="" alt=""
                      style="max-width:100%;max-height:75vh;object-fit:contain;">
                 <!-- Précédent -->
-                <button onclick="naviguerGalerie(-1)"
+                <button id="btnPrev"
                         class="btn btn-light position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle p-1"
-                        style="width:38px;height:38px;opacity:.85;" id="btnPrev">
+                        style="width:38px;height:38px;opacity:.85;">
                     <i class="bi bi-chevron-left"></i>
                 </button>
                 <!-- Suivant -->
-                <button onclick="naviguerGalerie(1)"
+                <button id="btnNext"
                         class="btn btn-light position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle p-1"
-                        style="width:38px;height:38px;opacity:.85;" id="btnNext">
+                        style="width:38px;height:38px;opacity:.85;">
                     <i class="bi bi-chevron-right"></i>
                 </button>
             </div>
@@ -282,7 +281,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // ── Compatibilité véhicule — Tom Select dynamique ─────────────────────────────
 const MARQUES_COMPAT = {{ marques_existantes|safe }};
 const MODELES_COMPAT = {{ modeles_existants|safe }};
@@ -410,5 +409,24 @@ document.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft')  naviguerGalerie(-1);
     if (e.key === 'ArrowRight') naviguerGalerie(1);
 });
+
+// ── Event listeners CSP-safe (remplacent les onclick= inline) ────────────────
+document.getElementById('btn-ajouter-compat').addEventListener('click', ajouterCompat);
+
+document.getElementById('compat-tbody').addEventListener('click', function (e) {
+    const btn = e.target.closest('.btn-supprimer-compat');
+    if (btn) supprimerCompat(btn);
+});
+
+document.getElementById('btnPrev').addEventListener('click', function () { naviguerGalerie(-1); });
+document.getElementById('btnNext').addEventListener('click', function () { naviguerGalerie(1); });
+
+const galerieContainer = document.getElementById('galerie-photos');
+if (galerieContainer) {
+    galerieContainer.addEventListener('click', function (e) {
+        const img = e.target.closest('img[data-index]');
+        if (img) ouvrirGalerie(img);
+    });
+}
 </script>
 {% endblock %}
