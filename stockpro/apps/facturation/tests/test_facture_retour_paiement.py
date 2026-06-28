@@ -24,13 +24,14 @@ class FactureRetourPaiementTest(TestCase):
             actif=True,
             entreprise_id=self.entreprise.id
         )
-        # Créer une facture
+        # Créer une facture (taux_tva=0 pour isoler les calculs des lignes)
         self.facture = Facture.objects.create(
             client=self.client_obj,
             entreprise_id=self.entreprise.id,
             montant_ttc=Decimal('4000'),
             montant_paye=Decimal('0'),
-            statut=Facture.Statut.EMISE
+            statut=Facture.Statut.EMISE,
+            taux_tva=Decimal('0'),
         )
         # Ajouter une ligne de facture
         self.ligne = LigneFacture.objects.create(

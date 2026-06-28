@@ -216,7 +216,7 @@ class Facture(TenantMixin):
         from decimal import Decimal
         remise = ht * (self.remise_globale / Decimal('100'))
         ht_net = ht - remise
-        tva = ht_net * (self.taux_tva / 100)
+        tva = ht_net * (Decimal(str(self.taux_tva)) / Decimal('100'))
         ttc = ht_net + tva
 
         self.montant_ht = ht_net
