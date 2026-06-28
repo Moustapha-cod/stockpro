@@ -6,6 +6,7 @@ from datetime import date
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Q, F, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -84,8 +85,13 @@ def produit_liste(request):
     categories = Categorie.objects.filter(entreprise=entreprise, actif=True)
     panier = request.session.get('panier', [])
 
+    total = qs.count()
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
     context = {
-        'produits': qs,
+        'produits': page_obj,
+        'page_obj': page_obj,
         'categories': categories,
         'q': q,
         'categorie_id': categorie_id,
@@ -95,11 +101,11 @@ def produit_liste(request):
         'compat_marque': compat_marque,
         'compat_modele': compat_modele,
         'compat_annee': compat_annee,
-        'total': qs.count(),
+        'total': total,
         'type_vehicule_choices': Produit.TypeVehicule.choices,
         'marques_pieces_json': json.dumps(marques_pieces),
         'compat_marques_json': json.dumps(compat_marques),
-        'panier_json': json.dumps(panier),   # JSON valide pour le JS
+        'panier_json': json.dumps(panier),
         'nb_panier': sum(item['quantite'] for item in panier),
     }
     return render(request, 'stock/produit_liste.html', context)
@@ -212,11 +218,8 @@ def produit_modifier(request, pk):
 
 @login_required
 def produit_photo_supprimer(request, pk):
-    photo = get_object_or_404(ProduitPhoto, pk=pk)
+    photo = get_object_or_404(ProduitPhoto, pk=pk, produit__entreprise=request.entreprise)
     produit = photo.produit
-    if produit.entreprise != request.entreprise:
-        messages.error(request, 'Accès non autorisé.')
-        return redirect('stock:produit_liste')
     if request.method == 'POST':
         photo.image.delete(save=False)
         photo.delete()
@@ -329,8 +332,11 @@ def mouvement_liste(request):
     type_filtre = request.GET.get('type', '')
     if type_filtre and type_filtre in dict(MouvementStock.TypeMouvement.choices):
         qs = qs.filter(type_mouvement=type_filtre)
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
     context = {
-        'mouvements': qs[:100],
+        'mouvements': page_obj,
+        'page_obj': page_obj,
         'type_filtre': type_filtre,
         'types': MouvementStock.TypeMouvement.choices,
     }
@@ -501,6 +507,7 @@ def inventaire_export(request):
         round(totaux['valeur_achat'] or 0, 0),
         round(totaux['valeur_vente'] or 0, 0),
     ])
+    return response
 
 
 # ── API recherche produits (Tom Select) ───────────────────────────────────────

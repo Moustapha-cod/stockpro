@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Page introuvable — StockPro{% endblock %}
+{% block page_title %}Page introuvable{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column align-items-center justify-content-center py-5 text-center">
+    <div style="font-size:5rem;color:#dee2e6;line-height:1;">
+        <i class="bi bi-file-earmark-x"></i>
+    </div>
+    <h1 class="fw-bold mt-3" style="font-size:4rem;color:#6c757d;">404</h1>
+    <h2 class="h4 fw-semibold mb-2">Page introuvable</h2>
+    <p class="text-muted mb-4" style="max-width:420px;">
+        La page que vous recherchez n'existe pas ou a été déplacée.
+    </p>
+    <div class="d-flex gap-2">
+        <a href="{% url 'dashboard:index' %}" class="btn btn-primary">
+            <i class="bi bi-house me-1"></i>Tableau de bord
+        </a>
+        <button onclick="history.back()" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Retour
+        </button>
+    </div>
+</div>
+{% endblock %}

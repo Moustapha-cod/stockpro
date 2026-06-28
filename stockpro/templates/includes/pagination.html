@@ -1,0 +1,44 @@
+{% if page_obj.has_other_pages %}
+<nav class="mt-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <small class="text-muted">
+    {{ page_obj.start_index }}–{{ page_obj.end_index }} sur <strong>{{ page_obj.paginator.count }}</strong> résultats
+  </small>
+  <ul class="pagination pagination-sm mb-0">
+
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page=1{% for key, val in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ val }}{% endif %}{% endfor %}">«</a>
+    </li>
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, val in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ val }}{% endif %}{% endfor %}">‹</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">«</span></li>
+    <li class="page-item disabled"><span class="page-link">‹</span></li>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+      {% if page_obj.number == num %}
+        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+      {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% for key, val in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ val }}{% endif %}{% endfor %}">{{ num }}</a>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, val in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ val }}{% endif %}{% endfor %}">›</a>
+    </li>
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, val in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ val }}{% endif %}{% endfor %}">»</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">›</span></li>
+    <li class="page-item disabled"><span class="page-link">»</span></li>
+    {% endif %}
+
+  </ul>
+</nav>
+{% endif %}

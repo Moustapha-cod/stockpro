@@ -3,6 +3,8 @@ apps/stock/models.py
 Gestion complète du stock : produits, catégories, fournisseurs, mouvements
 """
 
+from functools import cached_property
+
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator
@@ -192,7 +194,7 @@ class Produit(TenantMixin):
 
     # ── Propriétés calculées ──────────────────────────────────────────────────
 
-    @property
+    @cached_property
     def cout_moyen_pondere(self):
         """Coût Unitaire Moyen Pondéré (CUMP) calculé depuis les mouvements d'entrée."""
         from django.db.models import Sum, F

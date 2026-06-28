@@ -2,6 +2,7 @@
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Q, Sum, Count, F
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
@@ -30,7 +31,11 @@ def client_liste(request):
     qs = Client.objects.filter(entreprise=entreprise)
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(telephone__icontains=q) | Q(email__icontains=q))
-    return render(request, 'facturation/client_liste.html', {'clients': qs, 'q': q})
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'facturation/client_liste.html', {
+        'clients': page_obj, 'page_obj': page_obj, 'q': q,
+    })
 
 
 @login_required
@@ -81,8 +86,11 @@ def facture_liste(request):
     if q:
         qs = qs.filter(Q(numero__icontains=q) | Q(client__nom__icontains=q))
 
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
     context = {
-        'factures': qs,
+        'factures': page_obj,
+        'page_obj': page_obj,
         'statut': statut,
         'q': q,
         'statuts': Facture.Statut.choices,
