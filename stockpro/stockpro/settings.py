@@ -199,7 +199,7 @@ _static_candidates = [
 ]
 STATICFILES_DIRS = [p for p in dict.fromkeys(_static_candidates) if p.is_dir()]
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
