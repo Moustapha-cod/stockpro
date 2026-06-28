@@ -21,6 +21,7 @@ from django.db.models import Sum, Count, Q, F
 from django.db.models.functions import TruncDay, TruncMonth
 from django.http import HttpResponse
 from django.shortcuts import render
+from apps.common.exports import stream_csv_response
 from django.utils import timezone
 
 from apps.stock.models import Produit, MouvementStock, Categorie
@@ -636,61 +637,50 @@ def rapport_stock_export(request):
     entreprise = request.entreprise
     aujourd_hui = date.today()
 
-    produits = Produit.objects.filter(
+    qs = Produit.objects.filter(
         entreprise=entreprise, actif=True
     ).select_related('categorie', 'fournisseur').order_by('categorie__nom', 'nom')
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    response['Content-Disposition'] = f'attachment; filename="rapport_stock_{aujourd_hui}.csv"'
-
-    writer = csv.writer(response, delimiter=';')
-    writer.writerow([
-        'Référence', 'Produit', 'Catégorie', 'Fournisseur',
-        'Stock actuel', 'Seuil alerte', 'Statut stock',
-        'Prix achat (FCFA)', 'Prix vente (FCFA)',
-        'Valeur stock achat (FCFA)', 'Valeur stock vente (FCFA)',
-    ])
-
-    for p in produits:
-        if p.quantite_stock == 0:
-            statut = 'Rupture'
-        elif p.seuil_alerte and p.quantite_stock <= p.seuil_alerte:
-            statut = 'Alerte'
-        else:
-            statut = 'OK'
-
-        valeur_achat = (p.quantite_stock or 0) * (p.prix_achat or 0)
-        valeur_vente = (p.quantite_stock or 0) * (p.prix_vente or 0)
-
-        writer.writerow([
-            p.reference or '',
-            p.nom,
-            p.categorie.nom if p.categorie else '',
-            p.fournisseur.nom if p.fournisseur else '',
-            p.quantite_stock or 0,
-            p.seuil_alerte or 0,
-            statut,
-            p.prix_achat or 0,
-            p.prix_vente or 0,
-            round(valeur_achat, 0),
-            round(valeur_vente, 0),
-        ])
-
-    # Ligne totaux
-    totaux = Produit.objects.filter(entreprise=entreprise, actif=True).aggregate(
+    totaux = qs.aggregate(
         total_articles=Sum('quantite_stock'),
         valeur_achat=Sum(F('quantite_stock') * F('prix_achat')),
         valeur_vente=Sum(F('quantite_stock') * F('prix_vente')),
     )
-    writer.writerow([])
-    writer.writerow([
-        'TOTAL', '', '', '',
-        totaux['total_articles'] or 0, '', '', '', '',
-        round(totaux['valeur_achat'] or 0, 0),
-        round(totaux['valeur_vente'] or 0, 0),
-    ])
 
-    return response
+    def rows():
+        yield [
+            'Référence', 'Produit', 'Catégorie', 'Fournisseur',
+            'Stock actuel', 'Seuil alerte', 'Statut stock',
+            'Prix achat (FCFA)', 'Prix vente (FCFA)',
+            'Valeur stock achat (FCFA)', 'Valeur stock vente (FCFA)',
+        ]
+        for p in qs.iterator(chunk_size=200):
+            qte   = p.quantite_stock or 0
+            achat = p.prix_achat or 0
+            vente = p.prix_vente or 0
+            if qte == 0:
+                statut = 'Rupture'
+            elif p.seuil_alerte and qte <= p.seuil_alerte:
+                statut = 'Alerte'
+            else:
+                statut = 'OK'
+            yield [
+                p.reference or '', p.nom,
+                p.categorie.nom if p.categorie else '',
+                p.fournisseur.nom if p.fournisseur else '',
+                qte, p.seuil_alerte or 0, statut,
+                achat, vente,
+                round(qte * achat, 0), round(qte * vente, 0),
+            ]
+        yield []
+        yield [
+            'TOTAL', '', '', '',
+            totaux['total_articles'] or 0, '', '', '', '',
+            round(totaux['valeur_achat'] or 0, 0),
+            round(totaux['valeur_vente'] or 0, 0),
+        ]
+
+    return stream_csv_response(rows(), f'rapport_stock_{aujourd_hui}.csv')
 
 
 # ── Export CSV rapport de ventes ──────────────────────────────────────────────
@@ -714,71 +704,62 @@ def rapport_ventes_export(request):
         date_emission__gte=debut,
     ).select_related('client').order_by('-date_emission')
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    response['Content-Disposition'] = f'attachment; filename="rapport_ventes_{aujourd_hui}_({jours}j).csv"'
+    # Requêtes agrégées en avance (pas de N+1 pendant le streaming)
+    top_produits = list(
+        LigneFacture.objects.filter(
+            facture__entreprise=entreprise,
+            facture__date_emission__gte=debut,
+        ).values('produit__nom', 'produit__reference').annotate(
+            qte=Sum('quantite'),
+            ca=Sum(F('quantite') * F('prix_unitaire_ht'))
+        ).order_by('-ca')[:20]
+    )
 
-    writer = csv.writer(response, delimiter=';')
+    par_mode = list(
+        Paiement.objects.filter(
+            entreprise=entreprise,
+            date_paiement__gte=debut
+        ).values('mode_paiement').annotate(
+            total=Sum('montant'), nb=Count('id')
+        ).order_by('-total')
+    )
 
-    # Section 1 : liste des factures
-    writer.writerow([f'RAPPORT DE VENTES — {jours} derniers jours — {aujourd_hui}'])
-    writer.writerow([])
-    writer.writerow(['=== FACTURES ==='])
-    writer.writerow([
-        'Numéro', 'Date', 'Client', 'Statut',
-        'Montant HT (FCFA)', 'TVA (FCFA)', 'Montant TTC (FCFA)',
-        'Montant payé (FCFA)', 'Reste dû (FCFA)',
-    ])
+    def rows():
+        yield [f'RAPPORT DE VENTES — {jours} derniers jours — {aujourd_hui}']
+        yield []
+        yield ['=== FACTURES ===']
+        yield [
+            'Numéro', 'Date', 'Client', 'Statut',
+            'Montant HT (FCFA)', 'TVA (FCFA)', 'Montant TTC (FCFA)',
+            'Montant payé (FCFA)', 'Reste dû (FCFA)',
+        ]
+        for f in factures.iterator(chunk_size=200):
+            reste = (f.montant_ttc or 0) - (f.montant_paye or 0)
+            yield [
+                f.numero,
+                f.date_emission.strftime('%d/%m/%Y') if f.date_emission else '',
+                f.client.nom if f.client else '',
+                f.get_statut_display(),
+                round(f.montant_ht or 0, 0),
+                round((f.montant_ttc or 0) - (f.montant_ht or 0), 0),
+                round(f.montant_ttc or 0, 0),
+                round(f.montant_paye or 0, 0),
+                round(reste, 0),
+            ]
+        yield []
+        yield ['=== TOP PRODUITS VENDUS ===']
+        yield ['Référence', 'Produit', 'Quantité vendue', 'CA HT (FCFA)']
+        for p in top_produits:
+            yield [
+                p['produit__reference'] or '',
+                p['produit__nom'] or '',
+                p['qte'],
+                round(p['ca'] or 0, 0),
+            ]
+        yield []
+        yield ['=== MODES DE PAIEMENT ===']
+        yield ['Mode', 'Nombre', 'Total (FCFA)']
+        for m in par_mode:
+            yield [m['mode_paiement'], m['nb'], round(m['total'] or 0, 0)]
 
-    for f in factures:
-        reste = (f.montant_ttc or 0) - (f.montant_paye or 0)
-        writer.writerow([
-            f.numero,
-            f.date_emission.strftime('%d/%m/%Y') if f.date_emission else '',
-            f.client.nom if f.client else '',
-            f.get_statut_display(),
-            round(f.montant_ht or 0, 0),
-            round((f.montant_ttc or 0) - (f.montant_ht or 0), 0),
-            round(f.montant_ttc or 0, 0),
-            round(f.montant_paye or 0, 0),
-            round(reste, 0),
-        ])
-
-    # Section 2 : top produits
-    top_produits = LigneFacture.objects.filter(
-        facture__entreprise=entreprise,
-        facture__date_emission__gte=debut,
-    ).values('produit__nom', 'produit__reference').annotate(
-        qte=Sum('quantite'),
-        ca=Sum(F('quantite') * F('prix_unitaire_ht'))
-    ).order_by('-ca')[:20]
-
-    writer.writerow([])
-    writer.writerow(['=== TOP PRODUITS VENDUS ==='])
-    writer.writerow(['Référence', 'Produit', 'Quantité vendue', 'CA HT (FCFA)'])
-    for p in top_produits:
-        writer.writerow([
-            p['produit__reference'] or '',
-            p['produit__nom'] or '',
-            p['qte'],
-            round(p['ca'] or 0, 0),
-        ])
-
-    # Section 3 : modes de paiement
-    par_mode = Paiement.objects.filter(
-        entreprise=entreprise,
-        date_paiement__gte=debut
-    ).values('mode_paiement').annotate(
-        total=Sum('montant'), nb=Count('id')
-    ).order_by('-total')
-
-    writer.writerow([])
-    writer.writerow(['=== MODES DE PAIEMENT ==='])
-    writer.writerow(['Mode', 'Nombre', 'Total (FCFA)'])
-    for m in par_mode:
-        writer.writerow([
-            m['mode_paiement'],
-            m['nb'],
-            round(m['total'] or 0, 0),
-        ])
-
-    return response
+    return stream_csv_response(rows(), f'rapport_ventes_{aujourd_hui}_({jours}j).csv')

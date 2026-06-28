@@ -10,6 +10,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q, F, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from apps.common.exports import stream_csv_response
 
 from .models import Produit, ProduitPhoto, Categorie, Fournisseur, MouvementStock, CompatibiliteVehicule
 from .forms import ProduitForm, CategorieForm, FournisseurForm, MouvementStockForm, CompatibiliteFormSet
@@ -424,21 +425,19 @@ def inventaire(request):
 @login_required
 def inventaire_export(request):
     import logging
-    logger = logging.getLogger('securite')
-    entreprise = request.entreprise
-    logger.info(
+    logging.getLogger('securite').info(
         f"EXPORT_CSV_INVENTAIRE user={request.user.email} "
-        f"entreprise={entreprise} ip={request.META.get('REMOTE_ADDR')}"
+        f"entreprise={request.entreprise} ip={request.META.get('REMOTE_ADDR')}"
     )
+    entreprise = request.entreprise
 
     qs = Produit.objects.filter(
         entreprise=entreprise, actif=True
     ).select_related('categorie', 'fournisseur').order_by('categorie__nom', 'nom')
 
-    # Appliquer les mêmes filtres que la vue
-    q            = request.GET.get('q', '')
-    categorie_id = request.GET.get('categorie', '')
-    statut       = request.GET.get('statut', '')
+    q              = request.GET.get('q', '')
+    categorie_id   = request.GET.get('categorie', '')
+    statut         = request.GET.get('statut', '')
     fournisseur_id = request.GET.get('fournisseur', '')
 
     if q:
@@ -454,61 +453,52 @@ def inventaire_export(request):
     elif statut == 'normal':
         qs = qs.filter(quantite_stock__gt=F('seuil_alerte'))
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    response['Content-Disposition'] = f'attachment; filename="inventaire_{date.today()}.csv"'
-
-    writer = csv.writer(response, delimiter=';')
-    writer.writerow([
-        'Référence', 'Code barre', 'Produit', 'Marque', 'Modèles compatibles',
-        'Catégorie', 'Fournisseur', 'Emplacement', 'Unité',
-        'Stock actuel', 'Seuil alerte', 'Statut',
-        'Prix achat (FCFA)', 'Prix vente (FCFA)', 'Marge (FCFA)', 'Taux marge (%)',
-        'Valeur stock achat (FCFA)', 'Valeur stock vente (FCFA)',
-    ])
-
-    for p in qs:
-        if p.quantite_stock == 0:
-            statut_label = 'Rupture'
-        elif p.seuil_alerte and p.quantite_stock <= p.seuil_alerte:
-            statut_label = 'Alerte'
-        else:
-            statut_label = 'Normal'
-
-        writer.writerow([
-            p.reference or '',
-            p.code_barre or '',
-            p.nom,
-            p.marque or '',
-            p.modele_compatible or '',
-            p.categorie.nom if p.categorie else '',
-            p.fournisseur.nom if p.fournisseur else '',
-            p.emplacement or '',
-            p.unite or 'Pièce',
-            p.quantite_stock or 0,
-            p.seuil_alerte or 0,
-            statut_label,
-            p.prix_achat or 0,
-            p.prix_vente or 0,
-            round(p.marge, 0),
-            round(p.taux_marge, 1),
-            round((p.quantite_stock or 0) * (p.prix_achat or 0), 0),
-            round((p.quantite_stock or 0) * (p.prix_vente or 0), 0),
-        ])
-
-    # Ligne totaux
+    # Totaux calculés en BD avant le streaming (1 requête SQL)
     totaux = qs.aggregate(
         total_articles=Sum('quantite_stock'),
         valeur_achat=Sum(F('quantite_stock') * F('prix_achat')),
         valeur_vente=Sum(F('quantite_stock') * F('prix_vente')),
     )
-    writer.writerow([])
-    writer.writerow([
-        'TOTAL', '', '', '', '', '', '', '', '',
-        totaux['total_articles'] or 0, '', '', '', '', '', '',
-        round(totaux['valeur_achat'] or 0, 0),
-        round(totaux['valeur_vente'] or 0, 0),
-    ])
-    return response
+
+    def rows():
+        yield [
+            'Référence', 'Code barre', 'Produit', 'Marque', 'Modèles compatibles',
+            'Catégorie', 'Fournisseur', 'Emplacement', 'Unité',
+            'Stock actuel', 'Seuil alerte', 'Statut',
+            'Prix achat (FCFA)', 'Prix vente (FCFA)', 'Marge (FCFA)', 'Taux marge (%)',
+            'Valeur stock achat (FCFA)', 'Valeur stock vente (FCFA)',
+        ]
+        for p in qs.iterator(chunk_size=200):
+            qte   = p.quantite_stock or 0
+            achat = p.prix_achat or 0
+            vente = p.prix_vente or 0
+            marge = vente - achat
+            taux  = round((marge / achat * 100), 1) if achat else 0
+            if qte == 0:
+                statut_label = 'Rupture'
+            elif p.seuil_alerte and qte <= p.seuil_alerte:
+                statut_label = 'Alerte'
+            else:
+                statut_label = 'Normal'
+            yield [
+                p.reference or '', p.code_barre or '', p.nom, p.marque or '',
+                p.modele_compatible or '',
+                p.categorie.nom if p.categorie else '',
+                p.fournisseur.nom if p.fournisseur else '',
+                p.emplacement or '', p.unite or 'Pièce',
+                qte, p.seuil_alerte or 0, statut_label,
+                achat, vente, round(marge, 0), taux,
+                round(qte * achat, 0), round(qte * vente, 0),
+            ]
+        yield []
+        yield [
+            'TOTAL', '', '', '', '', '', '', '', '',
+            totaux['total_articles'] or 0, '', '', '', '', '', '',
+            round(totaux['valeur_achat'] or 0, 0),
+            round(totaux['valeur_vente'] or 0, 0),
+        ]
+
+    return stream_csv_response(rows(), f'inventaire_{date.today()}.csv')
 
 
 # ── API recherche produits (Tom Select) ───────────────────────────────────────
