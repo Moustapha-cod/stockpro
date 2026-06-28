@@ -204,6 +204,14 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# ─── Cache (rate limiting, futures optimisations) ────────────────────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'stockpro-cache',
+    }
+}
+
 # ─── Crispy Forms ─────────────────────────────────────────────────────────────
 CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
 CRISPY_TEMPLATE_PACK = 'bootstrap5'

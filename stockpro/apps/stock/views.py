@@ -14,6 +14,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .models import Produit, ProduitPhoto, Categorie, Fournisseur, MouvementStock, CompatibiliteVehicule
 from .forms import ProduitForm, CategorieForm, FournisseurForm, MouvementStockForm, CompatibiliteFormSet
 from apps.accounts.permissions import gestionnaire_requis
+from apps.common.decorators import rate_limit
 
 
 # ── Produits ──────────────────────────────────────────────────────────────────
@@ -513,6 +514,7 @@ def inventaire_export(request):
 # ── API recherche produits (Tom Select) ───────────────────────────────────────
 
 @login_required
+@rate_limit(max_calls=60, period=60)
 def api_produits_search(request):
     """Retourne une liste JSON de produits filtrés par nom, référence ou code-barres."""
     entreprise = request.entreprise
@@ -551,6 +553,7 @@ def api_produits_search(request):
 # ── API suggestions compatibilité véhicule ────────────────────────────────────
 
 @login_required
+@rate_limit(max_calls=120, period=60)
 def api_compat_suggestions(request):
     """Retourne les marques et modèles déjà enregistrés pour l'autocomplétion."""
     entreprise = request.entreprise
