@@ -187,7 +187,7 @@ LOCALE_PATHS = [BASE_DIR / 'locale']
 
 # ─── Fichiers statiques & médias ──────────────────────────────────────────────
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = BASE_DIR.parent / 'staticfiles'
 
 # Cherche le dossier static/ dans tous les emplacements possibles
 _settings_dir = Path(__file__).resolve().parent
