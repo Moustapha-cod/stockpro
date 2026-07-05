@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+{% load humanize %}
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>État des créances — {{ entreprise.nom }}</title>
+<style>
+@page {
+    size: A4;
+    margin: 1.5cm 2cm 1.8cm 2cm;
+    @bottom-center {
+        content: "Page " counter(page) " / " counter(pages);
+        font-size: 8px;
+        color: #999;
+    }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    color: #222;
+    line-height: 1.4;
+}
+
+/* ── En-tête ─────────────────────────────────────────── */
+.header-wrap {
+    border-bottom: 3px solid #dc3545;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+    width: 100%;
+}
+.header-table { width: 100%; border-collapse: collapse; }
+.company-name { font-size: 17px; font-weight: bold; color: #1a237e; margin-bottom: 3px; }
+.company-info { color: #555; font-size: 9.5px; margin-top: 1px; }
+.doc-title  { font-size: 20px; font-weight: bold; color: #dc3545; text-align: right; }
+.doc-sub    { font-size: 10px; color: #555; text-align: right; margin-top: 3px; }
+.doc-date   { font-size: 9px; color: #888; text-align: right; margin-top: 2px; }
+
+/* ── Résumé global ───────────────────────────────────── */
+.resume-box {
+    background: #fff5f5;
+    border: 1.5px solid #f5c6cb;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+    width: 100%;
+    border-collapse: collapse;
+}
+.resume-box td { font-size: 11px; vertical-align: middle; }
+.resume-kpi { font-size: 22px; font-weight: bold; color: #dc3545; }
+.resume-label { font-size: 9px; text-transform: uppercase; color: #888; font-weight: bold; letter-spacing: .06em; }
+.resume-sep { border-left: 1px solid #f5c6cb; padding-left: 18px; margin-left: 18px; }
+
+/* ── Bloc client ─────────────────────────────────────── */
+.client-block {
+    margin-bottom: 20px;
+    page-break-inside: avoid;
+}
+.client-header {
+    background: #1a237e;
+    color: #fff;
+    padding: 7px 10px;
+    width: 100%;
+    border-collapse: collapse;
+}
+.client-nom   { font-size: 12px; font-weight: bold; }
+.client-info  { font-size: 9.5px; color: #ccd0f5; margin-top: 2px; }
+.client-total { font-size: 13px; font-weight: bold; text-align: right; }
+.client-total-label { font-size: 8.5px; color: #ccd0f5; text-align: right; }
+
+/* ── Tableau factures ────────────────────────────────── */
+.table-facts { width: 100%; border-collapse: collapse; }
+.table-facts thead th {
+    background: #e9ecef;
+    padding: 5px 8px;
+    font-size: 8.5px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    text-align: left;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+}
+.table-facts thead th.right { text-align: right; }
+.table-facts thead th.center { text-align: center; }
+.table-facts tbody td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 10.5px;
+    vertical-align: middle;
+}
+.table-facts tbody tr:last-child td { border-bottom: none; }
+.table-facts tfoot td {
+    padding: 5px 8px;
+    border-top: 2px solid #dee2e6;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+/* ── Utilitaires ─────────────────────────────────────── */
+.text-right  { text-align: right; }
+.text-center { text-align: center; }
+.text-danger  { color: #dc3545; }
+.text-success { color: #198754; }
+.text-muted   { color: #888; }
+.fw-bold { font-weight: bold; }
+
+.badge-retard {
+    background: #dc3545;
+    color: #fff;
+    font-size: 7.5px;
+    font-weight: bold;
+    padding: 1px 5px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+.badge-partielle {
+    background: #fff3cd;
+    color: #664d03;
+    border: 1px solid #ffc107;
+    font-size: 7.5px;
+    font-weight: bold;
+    padding: 1px 5px;
+}
+.badge-emise {
+    background: #cfe2ff;
+    color: #084298;
+    border: 1px solid #9ec5fe;
+    font-size: 7.5px;
+    font-weight: bold;
+    padding: 1px 5px;
+}
+
+/* Barre progrès */
+.prog-bg  { background: #e9ecef; height: 5px; width: 100%; }
+.prog-bar { background: #198754; height: 5px; }
+
+/* ── Pied de page ────────────────────────────────────── */
+.footer-hr { border: none; border-top: 1px solid #e9ecef; margin-top: 20px; }
+.footer-text {
+    text-align: center;
+    font-size: 8.5px;
+    color: #aaa;
+    margin-top: 6px;
+}
+</style>
+</head>
+<body>
+
+<!-- En-tête -->
+<div class="header-wrap">
+    <table class="header-table">
+        <tr>
+            <td style="width:55%;vertical-align:top;">
+                <div class="company-name">{{ entreprise.nom }}</div>
+                {% if entreprise.telephone %}
+                <div class="company-info">Tél : {{ entreprise.telephone }}</div>
+                {% endif %}
+                {% if entreprise.email %}
+                <div class="company-info">Email : {{ entreprise.email }}</div>
+                {% endif %}
+                {% if entreprise.adresse %}
+                <div class="company-info">{{ entreprise.adresse }}</div>
+                {% endif %}
+                {% if entreprise.ninea %}
+                <div class="company-info">NINEA : {{ entreprise.ninea }}</div>
+                {% endif %}
+            </td>
+            <td style="width:45%;vertical-align:top;">
+                <div class="doc-title">ÉTAT DES CRÉANCES</div>
+                <div class="doc-sub">Clients débiteurs</div>
+                <div class="doc-date">Édité le {{ date_edition }}</div>
+                {% if filtre_retard %}
+                <div class="doc-date" style="color:#dc3545;font-weight:bold;">Filtre : factures en retard uniquement</div>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- Résumé global -->
+<table class="resume-box">
+    <tr>
+        <td>
+            <div class="resume-label">Total dû</div>
+            <div class="resume-kpi">{{ total_du|floatformat:0|intcomma }} FCFA</div>
+        </td>
+        <td class="resume-sep">
+            <div class="resume-label">Clients débiteurs</div>
+            <div style="font-size:18px;font-weight:bold;color:#495057;">{{ nb_clients }}</div>
+        </td>
+        <td class="resume-sep">
+            <div class="resume-label">Factures non soldées</div>
+            <div style="font-size:18px;font-weight:bold;color:#495057;">{{ nb_factures }}</div>
+        </td>
+        <td class="resume-sep">
+            <div class="resume-label">En retard</div>
+            <div style="font-size:18px;font-weight:bold;color:#dc3545;">{{ nb_retard }}</div>
+        </td>
+    </tr>
+</table>
+
+<!-- Blocs par client -->
+{% for bloc in clients_data %}
+<div class="client-block">
+    <!-- En-tête client -->
+    <table class="client-header">
+        <tr>
+            <td style="width:65%;vertical-align:top;">
+                <div class="client-nom">{{ bloc.client.nom }}</div>
+                <div class="client-info">
+                    {% if bloc.client.telephone %}Tél : {{ bloc.client.telephone }}{% endif %}
+                    {% if bloc.client.email %} &nbsp;|&nbsp; {{ bloc.client.email }}{% endif %}
+                    {% if bloc.client.ville %} &nbsp;|&nbsp; {{ bloc.client.ville }}{% endif %}
+                </div>
+            </td>
+            <td style="width:35%;vertical-align:top;">
+                <div class="client-total-label">Total dû par ce client</div>
+                <div class="client-total">{{ bloc.total_du|floatformat:0|intcomma }} FCFA</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Tableau des factures du client -->
+    <table class="table-facts">
+        <thead>
+            <tr>
+                <th>N° Facture</th>
+                <th class="center">Émission</th>
+                <th class="center">Échéance</th>
+                <th class="right">Total TTC</th>
+                <th class="right">Payé</th>
+                <th class="right">Reste dû</th>
+                <th class="center">Avancement</th>
+                <th class="center">Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in bloc.factures %}
+            <tr>
+                <td class="fw-bold">{{ f.numero }}</td>
+                <td class="text-center text-muted">{{ f.date_emission|date:"d/m/Y" }}</td>
+                <td class="text-center {% if f.est_en_retard %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                    {{ f.date_echeance|date:"d/m/Y"|default:"—" }}
+                    {% if f.est_en_retard %}
+                    <br><span class="badge-retard">EN RETARD</span>
+                    {% endif %}
+                </td>
+                <td class="text-right">{{ f.montant_ttc|floatformat:0|intcomma }}</td>
+                <td class="text-right text-success">{{ f.montant_paye|floatformat:0|intcomma }}</td>
+                <td class="text-right text-danger fw-bold">{{ f.montant_restant|floatformat:0|intcomma }}</td>
+                <td class="text-center">
+                    <div class="prog-bg">
+                        <div class="prog-bar" style="width:{{ f.taux_paiement }}%;"></div>
+                    </div>
+                    <div class="text-muted" style="font-size:8px;text-align:right;">{{ f.taux_paiement }}%</div>
+                </td>
+                <td class="text-center">
+                    {% if f.statut == 'partielle' %}
+                    <span class="badge-partielle">Partielle</span>
+                    {% else %}
+                    <span class="badge-emise">Émise</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="5" class="text-muted">Sous-total ({{ bloc.factures|length }} facture{{ bloc.factures|length|pluralize }})</td>
+                <td class="text-right text-danger">{{ bloc.total_du|floatformat:0|intcomma }} FCFA</td>
+                <td colspan="2"></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% empty %}
+<p style="text-align:center;color:#888;margin-top:40px;">Aucune créance en cours.</p>
+{% endfor %}
+
+<!-- Pied de page -->
+<hr class="footer-hr">
+<div class="footer-text">
+    {{ entreprise.nom }}
+    {% if entreprise.telephone %} — Tél : {{ entreprise.telephone }}{% endif %}
+    {% if entreprise.email %} — {{ entreprise.email }}{% endif %}
+    &nbsp;|&nbsp; Document généré le {{ date_edition }}
+</div>
+
+</body>
+</html>

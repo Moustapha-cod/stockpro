@@ -15,6 +15,7 @@ urlpatterns = [
 
     # Créances
     path('creances/', views.creances, name='creances'),
+    path('creances/pdf/', views.creances_pdf, name='creances_pdf'),
 
     # Factures
     path('factures/', views.facture_liste, name='facture_liste'),

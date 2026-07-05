@@ -440,6 +440,75 @@ def creances(request):
 
 
 @login_required
+def creances_pdf(request):
+    """Export PDF de l'état des créances clients, groupé par client."""
+    import traceback as tb
+    from itertools import groupby
+    from datetime import date
+    try:
+        from xhtml2pdf import pisa
+        entreprise = request.entreprise
+
+        factures_qs = Facture.objects.filter(
+            entreprise=entreprise,
+            statut__in=[Facture.Statut.EMISE, Facture.Statut.PARTIELLEMENT_PAYEE]
+        ).select_related('client').order_by('client__nom', 'date_echeance')
+
+        filtre_retard = request.GET.get('retard', '') == '1'
+        if filtre_retard:
+            factures_qs = factures_qs.filter(date_echeance__lt=date.today())
+
+        client_filtre = request.GET.get('client', '')
+        if client_filtre:
+            factures_qs = factures_qs.filter(client_id=client_filtre)
+
+        # Grouper par client
+        clients_data = []
+        for client, client_factures in groupby(factures_qs, key=lambda f: f.client):
+            factures_list = list(client_factures)
+            total_client = sum(f.montant_restant for f in factures_list)
+            clients_data.append({
+                'client': client,
+                'factures': factures_list,
+                'total_du': total_client,
+            })
+
+        total_du = sum(b['total_du'] for b in clients_data)
+        nb_factures = sum(len(b['factures']) for b in clients_data)
+        nb_clients = len(clients_data)
+        nb_retard = sum(
+            1 for b in clients_data for f in b['factures'] if f.est_en_retard
+        )
+
+        html = render_to_string('facturation/creances_pdf.html', {
+            'entreprise': entreprise,
+            'clients_data': clients_data,
+            'total_du': total_du,
+            'nb_factures': nb_factures,
+            'nb_clients': nb_clients,
+            'nb_retard': nb_retard,
+            'filtre_retard': filtre_retard,
+            'date_edition': date.today().strftime('%d/%m/%Y'),
+        }, request=request)
+
+        buffer = io.BytesIO()
+        err_log = io.StringIO()
+        pisa_status = pisa.CreatePDF(html, dest=buffer, link_callback=_pdf_link_callback, log=err_log)
+        if pisa_status.err:
+            detail = err_log.getvalue() or str(pisa_status.err)
+            return HttpResponse(f'Erreur xhtml2pdf :\n{detail}', status=500, content_type='text/plain; charset=utf-8')
+        buffer.seek(0)
+        nom_fichier = f"creances_{date.today().strftime('%Y%m%d')}.pdf"
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{nom_fichier}"'
+        return response
+    except Exception:
+        trace = tb.format_exc()
+        logger.exception('Erreur génération PDF créances')
+        return HttpResponse(f'Exception:\n{trace}', status=500, content_type='text/plain; charset=utf-8')
+
+
+@login_required
 def facture_imprimer(request, pk):
     entreprise = request.entreprise
     facture = get_object_or_404(Facture, pk=pk, entreprise=entreprise)
