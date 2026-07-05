@@ -614,32 +614,30 @@ def facture_retour_produit(request, pk):
                 montant_total_rembourse += quantite_retour * ligne.prix_unitaire_ht
                 retours.append((ligne, quantite_retour))
             if retours:
-                # Recalcule tous les totaux de la facture sur la base des nouvelles quantités
+                # Recalcule tous les totaux de la facture sur la base des nouvelles quantites
                 facture.recalculer_totaux()
 
-                # Ne pas créer de paiement négatif automatique : le montant_paye reste inchangé
-                # Si reste à payer < 0, afficher un message d'avoir/trop-perçu
-                reste_a_payer = facture.montant_ttc - facture.montant_paye
-                if reste_a_payer < 0:
-                    messages.info(request, f"Trop-perçu de {-reste_a_payer:,.0f} FCFA : un avoir ou remboursement est à prévoir.")
-                # Vérifie si tous les produits sont totalement retournés
-                lignes_restantes = 0
-                for ligne in facture.lignes.all():
-                    if ligne.quantite > 0:
-                        lignes_restantes += 1
+                # Si le client avait trop paye (retour sur facture soldee), ajuster montant_paye
+                trop_percu = facture.montant_paye - facture.montant_ttc
+                if trop_percu > 0:
+                    facture.montant_paye = facture.montant_ttc
+                    facture.save(update_fields=['montant_paye', 'date_modification'])
+                    messages.warning(request, f"Trop-perçu de {trop_percu:,.0f} FCFA — ce montant est à rembourser au client.")
+
+                # Verifie si tous les produits sont totalement retournes
+                lignes_restantes = facture.lignes.filter(quantite__gt=0).count()
                 if lignes_restantes == 0:
-                    # Annule la facture et met tous les montants à zéro
+                    # Annule la facture et remet tous les montants a zero
                     facture.statut = Facture.Statut.ANNULEE
                     facture.montant_ht = 0
                     facture.montant_tva = 0
                     facture.montant_ttc = 0
-                    facture.save(update_fields=['statut', 'montant_ht', 'montant_tva', 'montant_ttc', 'date_modification'])
-                    messages.success(request, "Tous les produits ont été retournés : la facture est annulée.")
+                    facture.montant_paye = 0
+                    facture.save(update_fields=['statut', 'montant_ht', 'montant_tva', 'montant_ttc', 'montant_paye', 'date_modification'])
+                    messages.success(request, "Tous les produits ont été retournés : la facture est annulée.")
                     return redirect('facturation:facture_detail', pk=pk)
                 else:
-                    facture.save(update_fields=['montant_ht', 'montant_tva', 'montant_ttc', 'date_modification'])
-                    if hasattr(facture, 'mettre_a_jour_statut'):
-                        facture.mettre_a_jour_statut()
+                    facture.mettre_a_jour_statut()
                     messages.success(request, f'Retour produit enregistré. Montant TTC diminué de {montant_total_rembourse:,.0f} FCFA.')
                     return redirect('facturation:facture_detail', pk=pk)
             else:
