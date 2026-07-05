@@ -263,7 +263,7 @@
 {% block extra_js %}
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 // Affichage debug des données reçues
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('debug-labels-ventes').textContent = JSON.stringify(labelsVentes);

@@ -178,7 +178,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 document.getElementById('sel-periode')?.addEventListener('change', function() {
     const custom = document.getElementById('custom-dates');
     if (this.value === 'custom') {

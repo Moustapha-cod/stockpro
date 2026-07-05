@@ -185,7 +185,7 @@
 
 {% block extra_js %}
 {{ produits_data|json_script:"produits-data" }}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
     'use strict';
 
@@ -365,7 +365,7 @@
 })();
 </script>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // ── Tom Select : recherche produit avec AJAX ───────────────────────────────
 var API_URL = '{% url "stock:api_produits_search" %}';
 

@@ -197,7 +197,7 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 // CA mensuel
 const labelsMois = {{ labels_mois|safe }};
 const dataMois   = {{ data_mois|safe }};
