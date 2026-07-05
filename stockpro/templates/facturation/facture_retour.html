@@ -28,13 +28,12 @@
                 {% endfor %}
             </tbody>
         </table>
-        <button type="button" class="btn btn-secondary" onclick="addFormRow()">Ajouter une ligne</button>
+        <button type="button" class="btn btn-secondary" id="btn-ajouter-ligne">Ajouter une ligne</button>
         <button type="submit" class="btn btn-primary">Valider le retour</button>
         <a href="{% url 'facturation:facture_detail' facture.pk %}" class="btn btn-secondary">Annuler</a>
     </form>
 </div>
-<script>
-// Ajout dynamique de lignes (formset)
+<script nonce="{{ csp_nonce }}">
 function addFormRow() {
     const totalForms = document.getElementById('id_form-TOTAL_FORMS');
     const formIdx = parseInt(totalForms.value);
@@ -59,5 +58,10 @@ function addFormRow() {
     table.appendChild(newRow);
     totalForms.value = formIdx + 1;
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.getElementById('btn-ajouter-ligne');
+    if (btn) btn.addEventListener('click', addFormRow);
+});
 </script>
 {% endblock %}

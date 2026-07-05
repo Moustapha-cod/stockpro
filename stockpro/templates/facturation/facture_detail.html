@@ -249,15 +249,15 @@
                     <div class="small text-muted fw-semibold mb-2">Type de paiement</div>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-success flex-grow-1 paiement-type-btn active"
-                                onclick="setType('integral', this)">
+                                data-type="integral">
                             <i class="bi bi-check-circle me-1"></i>Intégral
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 paiement-type-btn"
-                                onclick="setType('tranche', this)">
+                                data-type="tranche">
                             <i class="bi bi-pie-chart me-1"></i>Tranche
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1 paiement-type-btn"
-                                onclick="setType('dette', this)">
+                                data-type="dette">
                             <i class="bi bi-hourglass me-1"></i>Créance
                         </button>
                     </div>
@@ -267,12 +267,9 @@
                 <div id="tranches-rapides" class="mb-3" style="display:none;">
                     <div class="small text-muted fw-semibold mb-1">Montant rapide</div>
                     <div class="d-flex gap-1 flex-wrap">
-                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
-                                onclick="setMontant({% localize off %}{{ facture.montant_restant }}{% endlocalize %} * 0.25)">25%</button>
-                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
-                                onclick="setMontant({% localize off %}{{ facture.montant_restant }}{% endlocalize %} * 0.50)">50%</button>
-                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2"
-                                onclick="setMontant({% localize off %}{{ facture.montant_restant }}{% endlocalize %} * 0.75)">75%</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" data-pct="0.25">25%</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" data-pct="0.50">50%</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" data-pct="0.75">75%</button>
                     </div>
                 </div>
 
@@ -361,43 +358,47 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 const montantRestant = {% localize off %}{{ facture.montant_restant }}{% endlocalize %};
 
 function setType(type, btn) {
-    // Reset boutons
     document.querySelectorAll('.paiement-type-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
-    const formIntegral = document.getElementById('form-integral');
-    const formTranche  = document.getElementById('form-tranche');
+    const formIntegral    = document.getElementById('form-integral');
+    const formTranche     = document.getElementById('form-tranche');
     const tranchesRapides = document.getElementById('tranches-rapides');
-    const btnValider   = document.getElementById('btn-valider');
-    const montantInput = document.getElementById('montant-input');
+    const btnValider      = document.getElementById('btn-valider');
+    const montantInput    = document.getElementById('montant-input');
 
     if (type === 'integral') {
-        formIntegral.style.display  = '';
-        formTranche.style.display   = 'none';
+        formIntegral.style.display    = '';
+        formTranche.style.display     = 'none';
         tranchesRapides.style.display = 'none';
     } else if (type === 'tranche') {
-        formIntegral.style.display  = 'none';
-        formTranche.style.display   = '';
+        formIntegral.style.display    = 'none';
+        formTranche.style.display     = '';
         tranchesRapides.style.display = '';
         if (montantInput) montantInput.value = montantRestant;
-        if (btnValider) { btnValider.className = 'btn btn-primary btn-sm w-100'; btnValider.innerHTML = '<i class="bi bi-check-lg me-1"></i>Valider le paiement'; }
+        if (btnValider) {
+            btnValider.className = 'btn btn-primary btn-sm w-100';
+            btnValider.innerHTML = '<i class="bi bi-check-lg me-1"></i>Valider le paiement';
+        }
     } else if (type === 'dette') {
-        formIntegral.style.display  = 'none';
-        formTranche.style.display   = '';
+        formIntegral.style.display    = 'none';
+        formTranche.style.display     = '';
         tranchesRapides.style.display = 'none';
         if (montantInput) montantInput.value = montantRestant;
-        // Mode crédit
         const modeSelect = document.querySelector('[name="mode_paiement"]');
         if (modeSelect) {
             for (let opt of modeSelect.options) {
                 if (opt.value === 'credit') { modeSelect.value = 'credit'; break; }
             }
         }
-        if (btnValider) { btnValider.className = 'btn btn-warning btn-sm w-100 text-dark'; btnValider.innerHTML = '<i class="bi bi-hourglass me-1"></i>Enregistrer la créance'; }
+        if (btnValider) {
+            btnValider.className = 'btn btn-warning btn-sm w-100 text-dark';
+            btnValider.innerHTML = '<i class="bi bi-hourglass me-1"></i>Enregistrer la créance';
+        }
     }
 }
 
@@ -405,5 +406,14 @@ function setMontant(val) {
     const input = document.getElementById('montant-input');
     if (input) input.value = Math.round(val);
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-type]').forEach(function (btn) {
+        btn.addEventListener('click', function () { setType(this.dataset.type, this); });
+    });
+    document.querySelectorAll('[data-pct]').forEach(function (btn) {
+        btn.addEventListener('click', function () { setMontant(montantRestant * parseFloat(this.dataset.pct)); });
+    });
+});
 </script>
 {% endblock %}
