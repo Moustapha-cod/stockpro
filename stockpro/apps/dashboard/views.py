@@ -532,7 +532,18 @@ def rapport_ventes(request):
     ca = totaux['ca'] or Decimal('0')
     nb_factures = totaux['nb_factures'] or 0
     montant_paye = totaux['montant_paye'] or Decimal('0')
-    panier_moyen = (ca / nb_factures) if nb_factures else Decimal('0')
+
+    # Bénéfice réalisé = (prix_vente - prix_achat) × quantité sur les lignes de la période
+    ligne_filter = dict(
+        facture__entreprise=entreprise,
+        facture__statut__in=[Facture.Statut.PAYEE, Facture.Statut.PARTIELLEMENT_PAYEE],
+        facture__date_emission__gte=debut,
+    )
+    if periode == 'today' or date_debut:
+        ligne_filter['facture__date_emission__lte'] = fin
+    benefice_realise = LigneFacture.objects.filter(**ligne_filter).aggregate(
+        total=Sum((F('prix_unitaire_ht') - F('produit__prix_achat')) * F('quantite'))
+    )['total'] or Decimal('0')
 
     # Encaissement réel = total encaissé hors paiements à crédit
     from apps.facturation.models import Paiement
@@ -611,7 +622,7 @@ def rapport_ventes(request):
         'ca': ca,
         'encaissement_reel': encaissement_reel,
         'nb_factures': nb_factures,
-        'panier_moyen': panier_moyen,
+        'benefice_realise': benefice_realise,
         'creances': creances,
         'en_retard': en_retard,
         'top_clients': top_clients,

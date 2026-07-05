@@ -87,10 +87,12 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card shadow-sm border-0 h-100">
             <div class="card-body d-flex align-items-center gap-3">
-                <div class="rounded-3 bg-info bg-opacity-10 text-info d-flex align-items-center justify-content-center" style="width:52px;height:52px;font-size:1.4rem;"><i class="bi bi-cart3"></i></div>
+                <div class="rounded-3 bg-info bg-opacity-10 text-info d-flex align-items-center justify-content-center" style="width:52px;height:52px;font-size:1.4rem;"><i class="bi bi-graph-up-arrow"></i></div>
                 <div>
-                    <div class="text-muted small">Panier moyen</div>
-                    <div class="fw-bold fs-5">{{ panier_moyen|floatformat:2|intcomma }} <small class="text-muted fs-6">FCFA</small></div>
+                    <div class="text-muted small">Bénéfice réalisé</div>
+                    <div class="fw-bold fs-5 {% if benefice_realise >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ benefice_realise|floatformat:2|intcomma }} <small class="text-muted fs-6">FCFA</small>
+                    </div>
                 </div>
             </div>
         </div>
