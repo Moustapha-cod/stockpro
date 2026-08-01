@@ -11,6 +11,8 @@
 .btn-cart    { transition: transform .1s; }
 .btn-cart:active { transform: scale(.9); }
 .panier-badge { font-size:.65rem; min-width:18px; height:18px; line-height:18px; padding:0 4px; }
+@keyframes mic-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.15)} }
+.mic-pulse { animation: mic-pulse .7s ease-in-out infinite; }
 </style>
 {% endblock %}
 
@@ -26,11 +28,19 @@
         <div class="input-group input-group-sm" style="width:220px;">
           <input type="text" name="q" id="champ-recherche-q" value="{{ q }}" class="form-control form-control-sm"
                  placeholder="Nom, référence, OEM…">
-          <button type="button" class="btn btn-outline-secondary" id="btn-mic-produits"
-                  title="Recherche vocale — parlez après avoir cliqué">
-            <i class="bi bi-mic" id="icon-mic-produits"></i>
+          <button type="button" class="btn btn-outline-secondary" id="btn-mic-gcloud"
+                  title="Recherche vocale — cliquez et parlez (français ou wolof)">
+            <i class="bi bi-mic" id="icon-mic-gcloud"></i>
           </button>
         </div>
+        <!-- Sélecteur de langue vocale -->
+        <div class="btn-group btn-group-sm" id="grp-lang-vocal" title="Langue de la recherche vocale">
+          <button type="button" class="btn btn-outline-secondary active" id="btn-lang-fr" title="Français">🇫🇷 FR</button>
+          <button type="button" class="btn btn-outline-secondary" id="btn-lang-wo" title="Wolof">🇸🇳 WO</button>
+        </div>
+        <!-- Badge résultat transcription -->
+        <span id="badge-transcription" class="badge bg-light text-dark border d-none"
+              style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
 
         <select name="categorie" class="form-select form-select-sm" style="width:160px;">
           <option value="">Toutes catégories</option>
@@ -511,53 +521,148 @@ document.getElementById('btnNext').addEventListener('click', () => nav(1));
   });
 })();
 
-// ── Recherche vocale ────────────────────────────────────────────────────
+// ── Recherche vocale — Google Cloud Speech-to-Text v2 (Chirp / wolof + fr) ──
 (function () {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const btn  = document.getElementById('btn-mic-produits');
-  const icon = document.getElementById('icon-mic-produits');
-  const champ = document.getElementById('champ-recherche-q');
+  const ENDPOINT = '{% url "stock:transcription_vocale" %}';
+  const CSRF     = '{{ csrf_token }}';
 
-  if (!SR) {
-    // Navigateur non compatible (Firefox) — on masque le bouton discrètement
-    if (btn) { btn.title = 'Recherche vocale non supportée sur ce navigateur (utilisez Chrome ou Edge)'; btn.disabled = true; }
+  const btnMic  = document.getElementById('btn-mic-gcloud');
+  const iconMic = document.getElementById('icon-mic-gcloud');
+  const btnFr   = document.getElementById('btn-lang-fr');
+  const btnWo   = document.getElementById('btn-lang-wo');
+  const champQ  = document.getElementById('champ-recherche-q');
+  const badge   = document.getElementById('badge-transcription');
+
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    if (btnMic)  { btnMic.disabled = true; btnMic.title = 'Micro non supporté sur ce navigateur'; }
+    if (btnFr)   btnFr.parentElement.style.display = 'none';
     return;
   }
 
-  const recognition = new SR();
-  recognition.lang = 'fr-FR';
-  recognition.continuous = false;
-  recognition.interimResults = false;
+  let mediaRecorder = null;
+  let chunks        = [];
+  let enRegistrement = false;
+  let timerStop     = null;
 
-  let ecoute = false;
+  function getLangue() {
+    const fr = btnFr.classList.contains('active');
+    const wo = btnWo.classList.contains('active');
+    if (fr && !wo) return 'fr';
+    if (wo && !fr) return 'wo';
+    return 'auto';
+  }
 
-  recognition.onstart = function () {
-    ecoute = true;
-    btn.classList.replace('btn-outline-secondary', 'btn-danger');
-    icon.className = 'bi bi-mic-fill';
-    btn.title = 'Écoute en cours… cliquez pour arrêter';
-  };
+  function setEtat(etat) {
+    const cls = btnMic.classList;
+    cls.remove('btn-outline-secondary','btn-danger','btn-warning','btn-outline-danger','btn-outline-warning');
+    iconMic.classList.remove('mic-pulse');
+    btnMic.disabled = false;
 
-  recognition.onend = function () {
-    ecoute = false;
-    btn.classList.replace('btn-danger', 'btn-outline-secondary');
-    icon.className = 'bi bi-mic';
-    btn.title = 'Recherche vocale — parlez après avoir cliqué';
-  };
+    if (etat === 'repos') {
+      cls.add('btn-outline-secondary');
+      iconMic.className = 'bi bi-mic';
+      btnMic.title = 'Cliquez et parlez (français ou wolof)';
+      badge.classList.add('d-none');
+    } else if (etat === 'ecoute') {
+      cls.add('btn-danger');
+      iconMic.className = 'bi bi-mic-fill mic-pulse';
+      btnMic.title = 'Écoute… cliquez pour arrêter';
+    } else if (etat === 'chargement') {
+      cls.add('btn-warning');
+      iconMic.className = 'bi bi-hourglass-split';
+      btnMic.disabled = true;
+      btnMic.title = 'Transcription en cours…';
+    } else if (etat === 'erreur-permission') {
+      cls.add('btn-outline-danger');
+      iconMic.className = 'bi bi-mic-mute';
+      btnMic.title = 'Permission micro refusée — autorisez dans les paramètres du navigateur';
+      setTimeout(() => setEtat('repos'), 3500);
+    } else if (etat === 'erreur') {
+      cls.add('btn-outline-danger');
+      iconMic.className = 'bi bi-exclamation-triangle';
+      btnMic.title = 'Erreur — réessayez';
+      setTimeout(() => setEtat('repos'), 2500);
+    } else if (etat === 'vide') {
+      cls.add('btn-outline-warning');
+      iconMic.className = 'bi bi-soundwave';
+      btnMic.title = 'Rien détecté — réessayez';
+      setTimeout(() => setEtat('repos'), 2000);
+    }
+  }
 
-  recognition.onerror = function () {
-    recognition.onend();
-  };
+  async function demarrer() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunks = [];
+      mediaRecorder = new MediaRecorder(stream);
 
-  recognition.onresult = function (event) {
-    const texte = event.results[0][0].transcript;
-    champ.value = texte;
-    document.getElementById('form-filtres').submit();
-  };
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        envoyerAudio();
+      };
 
-  btn.addEventListener('click', function () {
-    if (ecoute) { recognition.stop(); } else { recognition.start(); }
+      mediaRecorder.start();
+      enRegistrement = true;
+      setEtat('ecoute');
+      timerStop = setTimeout(arreter, 6000);
+
+    } catch (err) {
+      setEtat(err.name === 'NotAllowedError' ? 'erreur-permission' : 'erreur');
+    }
+  }
+
+  function arreter() {
+    if (timerStop) { clearTimeout(timerStop); timerStop = null; }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    enRegistrement = false;
+    setEtat('chargement');
+  }
+
+  async function envoyerAudio() {
+    if (!chunks.length) { setEtat('repos'); return; }
+
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    const fd   = new FormData();
+    fd.append('audio', blob, 'voix.webm');
+    fd.append('langue', getLangue());
+
+    try {
+      const resp = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF },
+        body: fd,
+      });
+      const data = await resp.json();
+
+      if (data.texte && data.texte.trim().length > 0) {
+        champQ.value = data.texte;
+        badge.textContent = '\u{1F3A4} ' + data.texte;
+        badge.classList.remove('d-none');
+        document.getElementById('form-filtres').submit();
+      } else if (data.erreur) {
+        console.warn('Transcription :', data.erreur);
+        setEtat('erreur');
+      } else {
+        setEtat('vide');
+      }
+    } catch (e) {
+      setEtat('erreur');
+    }
+  }
+
+  btnMic.addEventListener('click', () => { if (enRegistrement) arreter(); else demarrer(); });
+
+  btnFr.addEventListener('click', () => {
+    btnFr.classList.toggle('active');
+    if (btnFr.classList.contains('active')) btnWo.classList.remove('active');
   });
+  btnWo.addEventListener('click', () => {
+    btnWo.classList.toggle('active');
+    if (btnWo.classList.contains('active')) btnFr.classList.remove('active');
+  });
+
+  setEtat('repos');
 })();
 </script>
 {% endblock %}

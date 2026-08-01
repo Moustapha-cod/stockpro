@@ -2,15 +2,20 @@
 
 import csv
 import json
+import logging
 from datetime import date
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, F, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.http import require_POST
 from apps.common.exports import stream_csv_response
+
+logger = logging.getLogger('securite')
 
 from .models import Produit, ProduitPhoto, Categorie, Fournisseur, MouvementStock, CompatibiliteVehicule
 from .forms import ProduitForm, CategorieForm, FournisseurForm, MouvementStockForm, CompatibiliteFormSet
@@ -538,6 +543,85 @@ def api_produits_search(request):
         })
 
     return JsonResponse({'results': results})
+
+
+@login_required
+@require_POST
+@rate_limit(max_calls=20, period=60)
+def transcription_vocale(request):
+    """
+    Reçoit un fichier audio (WebM/Opus) depuis le navigateur,
+    appelle Google Cloud Speech-to-Text v2 (modèle Chirp),
+    et retourne la transcription en JSON.
+    Supporte le wolof (wo-SN) et le français (fr-FR).
+    L'audio n'est jamais écrit sur le disque.
+    """
+    audio_file = request.FILES.get('audio')
+    if not audio_file:
+        return JsonResponse({'erreur': 'Aucun audio reçu'}, status=400)
+
+    if audio_file.size > 5 * 1024 * 1024:
+        return JsonResponse({'erreur': 'Audio trop volumineux (max 5 Mo)'}, status=400)
+
+    langue = request.POST.get('langue', 'auto')
+    audio_bytes = audio_file.read()
+
+    project_id = settings.GOOGLE_CLOUD_PROJECT
+    if not project_id:
+        return JsonResponse({
+            'erreur': 'GOOGLE_CLOUD_PROJECT non configuré sur le serveur'
+        }, status=503)
+
+    try:
+        from google.cloud import speech_v2
+        from google.cloud.speech_v2.types import cloud_speech
+    except ImportError:
+        return JsonResponse({
+            'erreur': 'Module google-cloud-speech non installé (pip install google-cloud-speech)'
+        }, status=503)
+
+    try:
+        client = speech_v2.SpeechClient()
+
+        if langue == 'wo':
+            language_codes = ['wo-SN']
+        elif langue == 'fr':
+            language_codes = ['fr-FR']
+        else:
+            language_codes = ['fr-FR', 'wo-SN']
+
+        config = cloud_speech.RecognitionConfig(
+            auto_decoding_config=cloud_speech.AutoDecodingConfig(),
+            language_codes=language_codes,
+            model='chirp',
+        )
+
+        recognizer = f'projects/{project_id}/locations/us-central1/recognizers/_'
+
+        gcloud_request = cloud_speech.RecognizeRequest(
+            recognizer=recognizer,
+            config=config,
+            content=audio_bytes,
+        )
+
+        response = client.recognize(request=gcloud_request)
+
+        if not response.results:
+            return JsonResponse({'texte': '', 'confidence': 0.0, 'langue': ''})
+
+        result = response.results[0]
+        alt = result.alternatives[0]
+
+        return JsonResponse({
+            'texte': alt.transcript,
+            'confidence': round(alt.confidence, 2),
+            'langue': getattr(result, 'language_code', ''),
+        })
+
+    except Exception:
+        logger.exception('Erreur Google Cloud Speech-to-Text')
+        return JsonResponse({'erreur': 'Erreur lors de la transcription vocale'}, status=500)
+
 
 
 # ── API suggestions compatibilité véhicule ────────────────────────────────────

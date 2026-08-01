@@ -30,3 +30,6 @@ django-jazzmin==3.0.4
 
 # ── Génération PDF ────────────────────────────────────────────────────────────
 xhtml2pdf==0.2.17
+
+# ── Reconnaissance vocale (Google Cloud Speech-to-Text v2 — Chirp/wolof) ─────
+google-cloud-speech==2.27.0

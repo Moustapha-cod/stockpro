@@ -235,6 +235,12 @@ EMAIL_USE_SSL  = config('EMAIL_USE_SSL', default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='StockPro Automobile <noreply@stockpro.sn>')
 SERVER_EMAIL       = DEFAULT_FROM_EMAIL   # expéditeur des erreurs Django (admins)
 
+# ─── Google Cloud Speech-to-Text (recherche vocale wolof + français) ─────────
+# Créer un compte de service sur console.cloud.google.com et définir :
+#   GOOGLE_CLOUD_PROJECT=mon-projet-gcp
+#   GOOGLE_APPLICATION_CREDENTIALS=/chemin/vers/service-account.json
+GOOGLE_CLOUD_PROJECT = config('GOOGLE_CLOUD_PROJECT', default='')
+
 # ─── Clé primaire par défaut ──────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

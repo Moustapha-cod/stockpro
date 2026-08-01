@@ -33,6 +33,7 @@ urlpatterns = [
     # API
     path('api/produits/', views.api_produits_search, name='api_produits_search'),
     path('api/compat-suggestions/', views.api_compat_suggestions, name='api_compat_suggestions'),
+    path('api/transcription-vocale/', views.transcription_vocale, name='transcription_vocale'),
 
     # Panier
     path('panier/ajouter/<int:pk>/', views.panier_ajouter, name='panier_ajouter'),
