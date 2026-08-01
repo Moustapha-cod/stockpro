@@ -94,9 +94,16 @@
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white d-flex align-items-center justify-content-between">
         <span class="fw-semibold"><i class="bi bi-list-ul me-2 text-primary"></i>Lignes de facturation</span>
-        <button type="button" id="btn-add-ligne" class="btn btn-sm btn-outline-primary py-0">
-            <i class="bi bi-plus-lg me-1"></i>Ajouter une ligne
-        </button>
+        <div class="d-flex gap-2 align-items-center">
+            <button type="button" id="btn-mic-facture" class="btn btn-sm btn-outline-secondary py-0"
+                    title="Recherche vocale — parle le nom du produit pour la dernière ligne">
+                <i class="bi bi-mic" id="icon-mic-facture"></i>
+                <span class="ms-1" style="font-size:.75rem;" id="label-mic-facture">Vocal</span>
+            </button>
+            <button type="button" id="btn-add-ligne" class="btn btn-sm btn-outline-primary py-0">
+                <i class="bi bi-plus-lg me-1"></i>Ajouter une ligne
+            </button>
+        </div>
     </div>
     <div class="card-body p-0">
         {{ formset.management_form }}
@@ -443,5 +450,59 @@ document.querySelectorAll('.ligne-produit').forEach(function(el) {
     document.getElementById('lignes-body')?.dispatchEvent(new Event('input', {bubbles: true}));
 })();
 {% endif %}
+
+// ── Recherche vocale pour les lignes de facture ────────────────────────
+(function () {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var btn   = document.getElementById('btn-mic-facture');
+  var icon  = document.getElementById('icon-mic-facture');
+  var label = document.getElementById('label-mic-facture');
+
+  if (!SR) {
+    if (btn) { btn.disabled = true; btn.title = 'Non supporté — utilisez Chrome ou Edge'; }
+    return;
+  }
+
+  var recognition = new SR();
+  recognition.lang = 'fr-FR';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  var ecoute = false;
+
+  recognition.onstart = function () {
+    ecoute = true;
+    btn.classList.replace('btn-outline-secondary', 'btn-danger');
+    icon.className = 'bi bi-mic-fill';
+    label.textContent = 'Écoute…';
+  };
+
+  recognition.onend = function () {
+    ecoute = false;
+    btn.classList.replace('btn-danger', 'btn-outline-secondary');
+    icon.className = 'bi bi-mic';
+    label.textContent = 'Vocal';
+  };
+
+  recognition.onerror = function () { recognition.onend(); };
+
+  recognition.onresult = function (event) {
+    var texte = event.results[0][0].transcript;
+    // Cibler le Tom Select de la dernière ligne visible
+    var rows = document.querySelectorAll('#lignes-body .formset-row:not([style*="display: none"])');
+    if (!rows.length) return;
+    var lastRow = rows[rows.length - 1];
+    var selectEl = lastRow.querySelector('.ligne-produit');
+    if (selectEl && selectEl.tomselect) {
+      var ts = selectEl.tomselect;
+      ts.setTextboxValue(texte);
+      ts.load(texte);
+      ts.open();
+    }
+  };
+
+  btn.addEventListener('click', function () {
+    if (ecoute) { recognition.stop(); } else { recognition.start(); }
+  });
+})();
 </script>
 {% endblock %}

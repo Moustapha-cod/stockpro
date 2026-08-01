@@ -23,8 +23,14 @@
 
       <!-- Ligne 1 : recherche générale -->
       <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
-               placeholder="Nom, référence, OEM…" style="width:200px;">
+        <div class="input-group input-group-sm" style="width:220px;">
+          <input type="text" name="q" id="champ-recherche-q" value="{{ q }}" class="form-control form-control-sm"
+                 placeholder="Nom, référence, OEM…">
+          <button type="button" class="btn btn-outline-secondary" id="btn-mic-produits"
+                  title="Recherche vocale — parlez après avoir cliqué">
+            <i class="bi bi-mic" id="icon-mic-produits"></i>
+          </button>
+        </div>
 
         <select name="categorie" class="form-select form-select-sm" style="width:160px;">
           <option value="">Toutes catégories</option>
@@ -502,6 +508,55 @@ document.getElementById('btnNext').addEventListener('click', () => nav(1));
     options: COMPAT_MARQUES.map(m => ({value: m, text: m})),
     create: true, createOnBlur: true, maxItems: 1,
     placeholder: 'Marque véhicule…',
+  });
+})();
+
+// ── Recherche vocale ────────────────────────────────────────────────────
+(function () {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn  = document.getElementById('btn-mic-produits');
+  const icon = document.getElementById('icon-mic-produits');
+  const champ = document.getElementById('champ-recherche-q');
+
+  if (!SR) {
+    // Navigateur non compatible (Firefox) — on masque le bouton discrètement
+    if (btn) { btn.title = 'Recherche vocale non supportée sur ce navigateur (utilisez Chrome ou Edge)'; btn.disabled = true; }
+    return;
+  }
+
+  const recognition = new SR();
+  recognition.lang = 'fr-FR';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  let ecoute = false;
+
+  recognition.onstart = function () {
+    ecoute = true;
+    btn.classList.replace('btn-outline-secondary', 'btn-danger');
+    icon.className = 'bi bi-mic-fill';
+    btn.title = 'Écoute en cours… cliquez pour arrêter';
+  };
+
+  recognition.onend = function () {
+    ecoute = false;
+    btn.classList.replace('btn-danger', 'btn-outline-secondary');
+    icon.className = 'bi bi-mic';
+    btn.title = 'Recherche vocale — parlez après avoir cliqué';
+  };
+
+  recognition.onerror = function () {
+    recognition.onend();
+  };
+
+  recognition.onresult = function (event) {
+    const texte = event.results[0][0].transcript;
+    champ.value = texte;
+    document.getElementById('form-filtres').submit();
+  };
+
+  btn.addEventListener('click', function () {
+    if (ecoute) { recognition.stop(); } else { recognition.start(); }
   });
 })();
 </script>

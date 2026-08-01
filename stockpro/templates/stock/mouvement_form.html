@@ -22,7 +22,14 @@
                 <form method="post">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Produit *</label>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <label class="form-label fw-semibold mb-0">Produit *</label>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-mic-mouvement"
+                                    title="Recherche vocale — parlez le nom ou la référence du produit">
+                                <i class="bi bi-mic" id="icon-mic-mouvement"></i>
+                                <span class="ms-1" style="font-size:.75rem;" id="label-mic-mouvement">Vocal</span>
+                            </button>
+                        </div>
                         {{ form.produit }}
                         {% if form.produit.errors %}<div class="text-danger small">{{ form.produit.errors }}</div>{% endif %}
                     </div>
@@ -66,6 +73,57 @@
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
+// ── Recherche vocale pour le champ produit ─────────────────────────────
+(function () {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn   = document.getElementById('btn-mic-mouvement');
+  const icon  = document.getElementById('icon-mic-mouvement');
+  const label = document.getElementById('label-mic-mouvement');
+
+  if (!SR) {
+    if (btn) { btn.disabled = true; btn.title = 'Non supporté — utilisez Chrome ou Edge'; }
+    return;
+  }
+
+  const recognition = new SR();
+  recognition.lang = 'fr-FR';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  let ecoute = false;
+
+  recognition.onstart = function () {
+    ecoute = true;
+    btn.classList.replace('btn-outline-secondary', 'btn-danger');
+    icon.className = 'bi bi-mic-fill';
+    label.textContent = 'Écoute…';
+  };
+
+  recognition.onend = function () {
+    ecoute = false;
+    btn.classList.replace('btn-danger', 'btn-outline-secondary');
+    icon.className = 'bi bi-mic';
+    label.textContent = 'Vocal';
+  };
+
+  recognition.onerror = function () { recognition.onend(); };
+
+  recognition.onresult = function (event) {
+    const texte = event.results[0][0].transcript;
+    // Injecter dans Tom Select et déclencher la recherche AJAX
+    const selectEl = document.getElementById('id_produit');
+    if (selectEl && selectEl.tomselect) {
+      const ts = selectEl.tomselect;
+      ts.setTextboxValue(texte);
+      ts.load(texte);
+      ts.open();
+    }
+  };
+
+  btn.addEventListener('click', function () {
+    if (ecoute) { recognition.stop(); } else { recognition.start(); }
+  });
+})();
+
 new TomSelect('#id_produit', {
     valueField: 'value',
     labelField: 'text',
